@@ -1,0 +1,87 @@
+
+/*
+    light and dark mode theme color
+*/
+[data-theme="light"] {
+    --bg-color: hsla(0, 15%, 99%, 1);
+    --text-color: hsla(0, 15%, 15%, 1);
+    --primary-color: hsla(0, 15%, 17%, 1);
+    --accent-color: hsla(131, 26%, 46%, 1);
+    --secondary-color: hsla(250, 50%, 95%, 1);
+    --border-color: hsla(0, 15%, 88%, 1);
+    --button-color: #D9CDCD;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --shadow1: rgba(0, 0, 0, 0.04);
+    --shadow2: rgba(0, 0, 0, 0.08);
+    --shadow3: rgba(0, 0, 0, 0.16);
+    --shadow4: rgba(0, 0, 0, 0.24);
+    --shadow5: rgba(0, 0, 0, 0.32);
+    --shadow6: rgba(0, 0, 0, 0.4);
+}
+  
+[data-theme="dark"] {
+        --bg-color: hsla(0, 15%, 1%, 1);
+        --text-color: hsla(0, 15%, 93%, 1);
+        --text-secondary-color: #644a4a;
+        --primary-color: hsla(0, 15%, 17%, 1);
+        --accent-color: hsla(131, 26%, 38%, 1);
+        --secondary-color: #936c6c;
+        --border-color: hsla(0, 15%, 12%, 1);
+        --button-color: hsla(0, 15%, 17%, 1);
+        --shadow-color: rgba(0, 0, 0, 0.4);
+        --shadow1: rgba(0, 0, 0, 0.2);
+        --shadow2: rgba(0, 0, 0, 0.3);
+        --shadow3: rgba(0, 0, 0, 0.4);
+        --shadow4: rgba(0, 0, 0, 0.5);
+        --shadow5: rgba(0, 0, 0, 0.6);
+        --shadow6: rgba(0, 0, 0, 0.7);
+}
+  
+ /* General styles */
+body {
+    font-family: Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 20px;
+    text-align: center;
+    transition: all 0.3s ease-in-out;
+}
+  
+h1 {
+    font-size: 2rem;
+    color: var(--text-color);
+}
+  
+.btn {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    padding: 10px 16px;
+    font-size: 16px;
+    border: 1px solid var(--border-color);
+    background-color: var(--button-color);
+    color: var(--text-color);
+    border-radius: 5px;
+    cursor: pointer;
+    box-shadow: 2px 2px 5px var(--shadow-color);
+    transition: background 0.3s, color 0.3s;
+}
+
+.theme-picker{
+    width: 40px;
+    height: 40px;
+    border-radius: 100%;
+    padding: 7px;
+}
+
+.btn-accent {
+    border: 1px solid var(--border-color);
+    background-color: var(--accent-color);
+    color: var(--text-color);
+}
+  
+button:hover {
+    background-color: var(--secondary-color);
+}
+  
