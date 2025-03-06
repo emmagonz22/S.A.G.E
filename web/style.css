@@ -1,4 +1,3 @@
-
 /*
     light and dark mode theme color
 */
@@ -10,7 +9,8 @@
     --secondary-color: hsla(250, 50%, 95%, 1);
     --border-color: hsla(0, 15%, 88%, 1);
     --button-color: #D9CDCD;
-    --shadow-color: rgba(0, 0, 0, 0.1);
+    --shadow3: rgba(0, 0, 0, 0.1);
+    --header-bg-color: hsla(0, 14%, 83%, .74);
     --shadow1: rgba(0, 0, 0, 0.04);
     --shadow2: rgba(0, 0, 0, 0.08);
     --shadow3: rgba(0, 0, 0, 0.16);
@@ -28,7 +28,7 @@
         --secondary-color: #936c6c;
         --border-color: hsla(0, 15%, 12%, 1);
         --button-color: hsla(0, 15%, 17%, 1);
-        --shadow-color: rgba(0, 0, 0, 0.4);
+        --header-bg-color: hsla(0, 15%, 17%, .74);
         --shadow1: rgba(0, 0, 0, 0.2);
         --shadow2: rgba(0, 0, 0, 0.3);
         --shadow3: rgba(0, 0, 0, 0.4);
@@ -43,7 +43,6 @@ body {
     background-color: var(--bg-color);
     color: var(--text-color);
     margin: 0;
-    padding: 20px;
     text-align: center;
     transition: all 0.3s ease-in-out;
 }
@@ -64,15 +63,20 @@ h1 {
     color: var(--text-color);
     border-radius: 5px;
     cursor: pointer;
-    box-shadow: 2px 2px 5px var(--shadow-color);
+    box-shadow: 2px 2px 5px var(--shadow3);
     transition: background 0.3s, color 0.3s;
 }
 
 .theme-picker{
+    position: fixed;
     width: 40px;
     height: 40px;
     border-radius: 100%;
     padding: 7px;
+    display: block;
+    bottom: 30px;
+    left: 30px;
+    
 }
 
 .btn-accent {
@@ -84,4 +88,81 @@ h1 {
 button:hover {
     background-color: var(--secondary-color);
 }
+
+header {
+    height: 70px;
+    background-color: var(--header-bg-color) !important;
+    color: var(--text-color);
+    box-shadow: 0 2px 5px var(--shadow3);
+    text-align: center;
+    
+}
   
+nav{
+
+    height: 100%;
+}
+
+.nav-ul{
+    display: flex;
+    list-style: none;
+    width: 100%;
+    height: 100%;
+    justify-content: space-evenly;
+    margin: 0;
+    padding: 0;
+}
+
+.nav-li{
+    display: flex;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+a {
+    text-decoration: none;
+    color: var(--text-color);
+    transition: color 0.3s;
+}
+
+a:hover{
+    color: var(--accent-color);
+    background-color: transparent;
+}
+
+a:active{
+    color: var(--accent-color);
+    background-color: transparent;
+}
+
+.no-select {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.no-select:focus {
+    outline: none !important;
+}
+
+.selected-menu{
+    position: relative;
+    text-decoration: none; 
+}
+
+.selected-menu::after {
+    content: '';
+    position: absolute;
+    width: 200%; /* Makes underline 20% wider than text */
+    height: 2px; /* Adjust thickness as needed */
+    background-color: currentColor; /* Uses the current text color */
+    bottom: -0.6em; /* Matches your current offset */
+    left: -45%; /* Centers the wider underline */
+    display: block;
+}
