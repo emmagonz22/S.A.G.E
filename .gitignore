@@ -1,2 +1,4 @@
 build/
 tabler-icons*
+managed_components/espressif__network_provisioning/examples/wifi_prov/partitions.csv
+managed_components/espressif__network_provisioning/examples/wifi_prov/README.md

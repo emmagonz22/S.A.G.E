@@ -7,7 +7,7 @@ set(ENV{IDF_TARGET} "esp32")
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 # Define the project after including ESP-IDF project.cmake
-project(S.A.G.A)
+project(S.A.G.E)
 
 # Add extra component directories if needed
 set(EXTRA_COMPONENT_DIRS components)
