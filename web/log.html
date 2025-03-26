@@ -12,29 +12,43 @@
         <header>
             <nav>
                 <ul class="nav-ul no-select">
-                    <li class="nav-li"><a class="a-navbar selected-menu" href="index.html">Home</a></li>
+                    <!-- Create back button for logs-list.html -->
+                    <li class="nav-li"><a class="a-navbar" href="index.html">Home</a></li>
                     <li class="nav-li"><a class="a-navbar" href="logs-list.html">Logs</a></li>
                 </ul>
             </nav>    
         </header>
 
-        
-        <div class="content">
-            <!-- Start Routine -->
-            <button class="btn btn-home success"> Start Device </button>
-            <!-- End Routine -->
-            <button class="btn btn-home danger"> End Device </button>
+        <h1 class="page-title">Log</h1>
 
-            <!--
+        <div class="log-content">
 
-                Add Graph of the current run? 
+            <div class="log-card">
+                pH
+            </div>
 
-                Evaluate if this is necessary or a good feature
+            <div class="log-card">
+                Fertility
+            </div>
 
-            -->
+            <div class="log-card">
+                Enviroment Moisture
+            </div>
+
+            <div class="log-card">
+                Enviroment Temperature
+            </div>
+
+            <div class="log-card">
+                Soil Moisture
+            </div>
+
+            <div class="log-card">
+                Soil Temperature
+            </div>
+
         </div>
-
-
+  
         <button class="btn theme-picker no-select" @click="toggleTheme()">
             <template x-if="theme === 'dark'">
             <svg

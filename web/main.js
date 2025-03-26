@@ -1,19 +1,19 @@
 document.addEventListener("alpine:init", () => {
-    
-    Alpine.data("themeHandler", () => ({
-        theme: localStorage.getItem('theme') || 
-                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
-       
+    Alpine.data("themeHandler", themeHandler);
+});
+
+// Theme handler function
+function themeHandler() {
+    return {
+        theme: 'light',
         init() {
-            console.log("Theme initialize");
+            this.theme = localStorage.getItem('theme') || 'light';
             document.documentElement.setAttribute('data-theme', this.theme);
         },
-
         toggleTheme() {
-            this.theme = this.theme === 'dark' ? 'light' : 'dark';
+            this.theme = this.theme === 'light' ? 'dark' : 'light';
             document.documentElement.setAttribute('data-theme', this.theme);
             localStorage.setItem('theme', this.theme);
-            console.log("Theme toggled:", this.theme); // Debugging
         }
-    }));
-});
+    };
+}

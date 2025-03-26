@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>S.A.G.E Web Server</title>
+        <script defer src="alpine.min.js"></script>
+        <link rel="stylesheet" href="style.css">
+        <script src="main.js"></script>
+        <script src="logs_list.js"></script>
+    </head>
+    <body x-data="themeHandler" x-init="$data.init()">
+        <header>
+            <nav>
+                <ul class="nav-ul no-select">
+                    <li class="nav-li"><a class="a-navbar" href="index.html">Home</a></li>
+                    <li class="nav-li"><a class="a-navbar selected-menu" href="logs-list.html">Logs</a></li>
+                </ul>
+            </nav>    
+        </header>
+
+        <h1 class="page-title">Logs</h1>
+
+        <div class="logs-container" x-data="logsHandler" x-init="$data.init()">
+            <template x-if="loading">
+                <div class="loading">Loading logs...</div>
+            </template>
+            
+            <template x-if="!loading && logs.length === 0">
+                <div class="no-logs">No logs found</div>
+            </template>
+            
+            <div style="width: 100%;" x-show="!loading && logs.length > 0">
+                <template x-for="log in logs" :key="log.id">
+                    <a class="log-redirect-btn" x-on:click="goToLog(log.id)">
+                        <span class="log-info-container">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-file-description"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M9 17h6" /><path d="M9 13h6" /></svg>    
+                            <div class="log-info">
+                                <span class="log-name" x-text="log.fileName"></span>
+                                <span class="date-info" x-text="log.formattedDate"></span>
+                            </div>
+                        </span>
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            class="icon icon-tabler icons-tabler-outline icon-tabler-chevron-right"
+                            >
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                            <path d="M9 6l6 6l-6 6" />
+                        </svg>
+                    </a>
+                </template>
+            </div>
+        </div>
+
+        <div></div>
+        
+        <button class="btn theme-picker no-select" @click="toggleTheme()">
+            <template x-if="theme === 'dark'">
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="100%"
+                height="100%"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="icon icon-tabler icons-tabler-outline icon-tabler-sun"
+                >
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" />
+                <path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7" />
+            </svg>
+            </template>
+            <template x-if="theme === 'light'">
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="100%"
+                    height="100%"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="icon icon-tabler icons-tabler-outline icon-tabler-moon-stars"
+                    >
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+                    <path d="M17 4a2 2 0 0 0 2 2a2 2 0 0 0 -2 2a2 2 0 0 0 -2 -2a2 2 0 0 0 2 -2" />
+                    <path d="M19 11h2m-1 -1v2" />
+                </svg>
+            </template>
+        </button>
+    </body>
+</html>
