@@ -12,6 +12,12 @@ Linux & Macos
 https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/linux-macos-setup.html
 ```
 
+### Dependencies
+ 
+ idf.py add-dependency "espressif/arduino-esp32^3.0.2
+Given we are using Arduino Libraries we need the added dependencies.
+Warning! this might result in a CONFIG_FREERTOS_HZ error. You can consult the debugging section for help.
+ 
 
 To test the website locally in the computer install python 3 then run the following command inside the web folder:
 
@@ -53,4 +59,19 @@ In which case ensure, that you are using the appropiate flash size for your ESP3
 In case of the ESP32 WROOM32, it has a flash size of 4MB. Which can be changed through the MenuConfig
 
 Serial Flasher Config → Flash Size
+
+
+ CONFIG_FREERTOS_HZ Error:
+
+ ```
+CMake Error at managed_components/espressif__arduino-esp32/CMakeLists.txt:325 (message):
+  esp32-arduino requires CONFIG_FREERTOS_HZ=1000 (currently 100)
+
+
+-- Configuring incomplete, errors occurred!
+ninja: error: rebuilding 'build.ninja': subcommand failed
+```
+
+This error occurs because of the HZ in the built in files, the only way to fix it permanently is to go to the definition file and changing the 1000 to a 100.
+
 
