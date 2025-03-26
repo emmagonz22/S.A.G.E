@@ -1,3 +1,12 @@
+html {
+    --success: hsla(131, 26%, 46%, 1);
+    --success-hover: rgb(60, 103, 68);
+    --danger: rgba(255, 0, 0, 0.5);
+    --warning: rgba(255, 255, 0, 0.5);
+    --danger-hover: rgba(176, 14, 14, 0.5);
+    --warning-hover: rgba(180, 180, 7, 0.5);
+}
+
 /*
     light and dark mode theme color
 */
@@ -9,6 +18,7 @@
     --secondary-color: hsla(250, 50%, 95%, 1);
     --border-color: hsla(0, 15%, 88%, 1);
     --button-color: #D9CDCD;
+    --button-hover-color: #b2a9a9;
     --shadow3: rgba(0, 0, 0, 0.1);
     --header-bg-color: hsla(0, 14%, 83%, .74);
     --shadow1: rgba(0, 0, 0, 0.04);
@@ -28,6 +38,7 @@
         --secondary-color: #936c6c;
         --border-color: hsla(0, 15%, 12%, 1);
         --button-color: hsla(0, 15%, 17%, 1);
+        --button-hover-color:  rgb(34, 25, 25);
         --header-bg-color: hsla(0, 15%, 17%, .74);
         --shadow1: rgba(0, 0, 0, 0.2);
         --shadow2: rgba(0, 0, 0, 0.3);
@@ -39,6 +50,7 @@
   
  /* General styles */
 body {
+    height: 100vh;
     font-family: Arial, sans-serif;
     background-color: var(--bg-color);
     color: var(--text-color);
@@ -67,6 +79,14 @@ h1 {
     transition: background 0.3s, color 0.3s;
 }
 
+.btn-home { 
+    width: 200px;
+    height: 40px;
+    padding: 16px;
+    text-align: center;
+    margin: 8px;
+}
+
 .theme-picker{
     position: fixed;
     width: 40px;
@@ -85,9 +105,10 @@ h1 {
     color: var(--text-color);
 }
   
-button:hover {
-    background-color: var(--secondary-color);
+.btn:hover {
+    background-color: var(--button-hover-color);
 }
+
 
 header {
     height: 70px;
@@ -95,7 +116,6 @@ header {
     color: var(--text-color);
     box-shadow: 0 2px 5px var(--shadow3);
     text-align: center;
-    
 }
   
 nav{
@@ -121,7 +141,7 @@ nav{
     flex-direction: column;
 }
 
-a {
+.a-navbar {
     text-decoration: none;
     color: var(--text-color);
     transition: color 0.3s;
@@ -165,4 +185,135 @@ a:active{
     bottom: -0.6em; /* Matches your current offset */
     left: -45%; /* Centers the wider underline */
     display: block;
+}
+
+.log-redirect-btn {
+    display: flex;
+    width: 70%;
+    max-width: 400px;
+    height: 25px;
+    padding: 13px;
+    border-radius: 5px;
+    background-color: var(--button-color);
+    color: var(--text-color);
+    margin: 20px auto; /* Centers the button if desired */
+    text-decoration: none; /* Removes underline from link */
+    cursor: pointer;
+    justify-content: space-between;
+}
+
+.log-redirect-btn:hover {
+    background-color: var(--button-hover-color);
+    color: var(--text-color);
+}
+
+.log-redirect-btn:active {
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+}
+
+.log-info{
+    display: flex;
+    flex-direction: column;
+    text-align: start;
+    align-self: center; 
+    margin-left: 10px;
+}
+
+.log-info-container{
+    display: flex;
+    color: var(--text-color);
+    text-align: center;
+    align-self: center; 
+    align-items: center;
+    margin: 20px;
+    width: 100%;
+}
+
+.date-info{
+    color: var(--accent-color);
+    font-size: small;   
+}
+
+.success{
+    background-color: var(--success);
+}
+
+.success:hover{
+    background-color: var(--success-hover) !important;
+}
+
+.warning{
+    background-color: var(--warning);
+}
+
+.danger{
+    background-color: var(--danger);
+}
+
+.danger:hover{
+    background-color: var(--danger-hover) !important;
+}
+
+.content {
+    display: flex;
+    width: 100%;
+    min-height: calc(100vh - 70px); /* Subtract header height to use available space */
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+    flex-direction: column;
+}
+
+.logs-container
+{
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    align-items: center;
+    align-content: center;
+    justify-content: center;
+}
+
+.log-content{
+    display: grid;
+    /* Change the grid template columns depending on the size of the device, default is mobile with two columns*/
+    grid-template-columns: 1fr 1fr;
+    justify-items: center;
+    gap: 20px;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.log-card {
+    background-color: var(--accent-color);
+    width: 100px;
+    max-height: 120px;
+    min-height: 80px;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 4px 6px var(--shadow3);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.loading, .no-logs {
+    padding: 20px;
+    text-align: center;
+    width: 100%;
+    margin: 20px 0;
+    color: var(--text-color);
+}
+
+.loading {
+    font-style: italic;
+}
+
+.no-logs {
+    background-color: var(--button-color);
+    border-radius: 5px;
+    padding: 15px;
 }

@@ -13,11 +13,41 @@
             <nav>
                 <ul class="nav-ul no-select">
                     <!-- Create back button for logs-list.html -->
-                    <li class="nav-li"><a href="index.html">Home</a></li>
-                    <li class="nav-li"><a href="logs-list.html">Logs</a></li>
+                    <li class="nav-li"><a class="a-navbar" href="index.html">Home</a></li>
+                    <li class="nav-li"><a class="a-navbar" href="logs-list.html">Logs</a></li>
                 </ul>
             </nav>    
         </header>
+
+        <h1 class="page-title">Log</h1>
+
+        <div class="log-content">
+
+            <div class="log-card">
+                pH
+            </div>
+
+            <div class="log-card">
+                Fertility
+            </div>
+
+            <div class="log-card">
+                Enviroment Moisture
+            </div>
+
+            <div class="log-card">
+                Enviroment Temperature
+            </div>
+
+            <div class="log-card">
+                Soil Moisture
+            </div>
+
+            <div class="log-card">
+                Soil Temperature
+            </div>
+
+        </div>
   
         <button class="btn theme-picker no-select" @click="toggleTheme()">
             <template x-if="theme === 'dark'">
