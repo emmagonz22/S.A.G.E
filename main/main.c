@@ -68,6 +68,14 @@ void wifi_init_softap(void)
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 
+void sensor_task(void *pvParameter){
+    while(1){
+        SensorData sensorValues =read_sensors();
+        ESP_LOGI("SENSOR_MODULE", "Timestamp: %lu ms | Moisture: %.2f%% | Humidity: %.2f%% | Soil Temp: %.2f°C | Air Temp: %.2f°C", 
+                 sensorValues.currentMillis, sensorValues.moisturePercent, sensorValues.humidity, sensorValues.temperatureDS18B20, sensorValues.temperatureDHT);
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+}
 
 void app_main(void)
 {
@@ -101,5 +109,7 @@ void app_main(void)
 
     ESP_LOGI("SENSOR_MODULE", "Timestamp: %lu ms | Moisture: %.2f%% | Humidity: %.2f%% | Soil Temp: %.2f°C | Air Temp: %.2f°C", 
                  sensorValues.currentMillis, sensorValues.moisturePercent, sensorValues.humidity, sensorValues.temperatureDS18B20, sensorValues.temperatureDHT);
+
+    xTaskCreate(&sensor_task, "Sensor Task", 4096, NULL, 5, NULL);
 
 }
