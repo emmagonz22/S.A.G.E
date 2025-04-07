@@ -7,10 +7,27 @@ import { View, useTheme } from 'tamagui';
 export default function BlurTabBarBackground() {
   
   const theme = useTheme();
-
+  const { bottom } = useSafeAreaInsets();
   return (
-    <View style={StyleSheet.absoluteFill}>
-      <BlurView tint="light" style={StyleSheet.absoluteFill} />
+
+    <View style={[
+        {
+          position: 'absolute',
+          left: 10,
+          right: 10,
+          bottom: bottom - 10,
+          height: 70,
+          borderRadius: 16,
+          backgroundColor: 'transparent',
+          overflow: 'hidden', // Needed for borderRadius to apply to BlurView
+        },
+      ]}>
+      <BlurView tint="light" intensity={100} style={StyleSheet.absoluteFill} />
+      <View
+        backgroundColor="$background"
+        opacity={0.3} // Adjust overlay intensity
+        style={StyleSheet.absoluteFill}
+      />
     </View>
   );
 }
