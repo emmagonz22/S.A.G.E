@@ -28,6 +28,7 @@
         "xstring": "cpp",
         "xtree": "cpp",
         "xutility": "cpp",
-        "dht.h": "c"
+        "dht.h": "c",
+        "esp_event.h": "c"
     }
 }

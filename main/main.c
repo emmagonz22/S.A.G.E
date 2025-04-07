@@ -8,6 +8,7 @@
 #include "web_server.h"
 #include "esp_mac.h" 
 #include "sensor_processing.h"
+#include "esp_spiffs.h"
 
 /* Access Point Configuration, this data may change */
 #define ESP_WIFI_AP_SSID      "SAGE-ESP32-AP"      // Your AP name
@@ -68,6 +69,7 @@ void wifi_init_softap(void)
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 
+// Sensor Reading Collection
 void sensor_task(void *pvParameter){
     while(1){
         SensorData sensorValues =read_sensors();
@@ -76,6 +78,73 @@ void sensor_task(void *pvParameter){
         vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }
+
+static const char *TAG1 = "SENSOR_MODULE";
+bool stopLogging = false;
+char csv_buffer[4096];  // ~4KB buffer for storing session
+size_t buffer_index = 0;
+
+// CSV Portion - Probaly should be moved to the sensor processing
+void append_csv_row(uint32_t timestamp, float moisture, float humidity, float soil_temp, float air_temp) {
+    // Append to buffer
+    buffer_index += snprintf(&csv_buffer[buffer_index],
+        sizeof(csv_buffer) - buffer_index,
+        "%lu,%.2f,%.2f,%.2f,%.2f\n",
+        timestamp, moisture, humidity, soil_temp, air_temp);
+
+    // Avoid buffer overflow
+    if (buffer_index >= sizeof(csv_buffer) - 100) {
+        ESP_LOGW(TAG1, "CSV buffer is almost full!");
+    }
+}
+
+void save_csv_to_flash() {
+    FILE *f = fopen("/storage/session_log.csv", "w");
+    if (f == NULL) {
+        ESP_LOGE(TAG1, "Failed to open file for writing");
+        return;
+    }
+    fprintf(f, "Timestamp,Moisture,Humidity,SoilTemp,AirTemp\n"); // Header
+    fwrite(csv_buffer, 1, buffer_index, f);
+    fclose(f);
+    ESP_LOGI(TAG1, "CSV file saved to /storage/session_log.csv");
+}
+
+
+void init_spiffs(void) {
+    esp_vfs_spiffs_conf_t conf = {
+      .base_path = "/storage",
+      .partition_label = "storage",
+      .max_files = 5,
+      .format_if_mount_failed = true
+    };
+
+    esp_err_t ret = esp_vfs_spiffs_register(&conf);
+
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG1, "Failed to mount or format filesystem");
+    } else {
+        ESP_LOGI(TAG1, "SPIFFS mounted successfully");
+    }
+}
+
+void read_csv_from_flash() {
+    FILE *f = fopen("/storage/session_log.csv", "r");
+    if (f == NULL) {
+        ESP_LOGE(TAG1, "Failed to open CSV file for reading");
+        return;
+    }
+
+    char line[128]; // Adjust buffer size as needed
+    while (fgets(line, sizeof(line), f)) {
+        ESP_LOGI(TAG1, "CSV: %s", line);  // Output to serial console
+    }
+
+    fclose(f);
+}
+
+
+//---------------------------------------------
 
 void app_main(void)
 {
@@ -112,4 +181,9 @@ void app_main(void)
 
     xTaskCreate(&sensor_task, "Sensor Task", 4096, NULL, 5, NULL);
 
+    // CSV Creation
+    init_spiffs();
+    append_csv_row(sensorValues.currentMillis, sensorValues.moisturePercent, sensorValues.humidity, sensorValues.temperatureDS18B20, sensorValues.temperatureDHT);
+    save_csv_to_flash();
+    read_csv_from_flash();
 }

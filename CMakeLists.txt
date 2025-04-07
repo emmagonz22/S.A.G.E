@@ -14,3 +14,6 @@ set(EXTRA_COMPONENT_DIRS components)
 
 # Create SPIFFS partition image for web content
 spiffs_create_partition_image(storage web FLASH_IN_PROJECT)
+
+# # Mount "storage" partition from main/spiffs_image
+# spiffs_create_partition_image(storage main/spiffs_image FLASH_IN_PROJECT)
