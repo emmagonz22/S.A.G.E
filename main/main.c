@@ -110,7 +110,7 @@ void app_main(void)
     wifi_init_softap();
 
     /* Start web server */
-    
+    sensor_init();
     command_queue = xQueueCreate(10, sizeof(CommandType));
 
     xTaskCreate(main_command_handler, "CommandHandler", 4096, NULL, 5, NULL);
