@@ -6,6 +6,7 @@
 #include "esp_event.h"
 #include "esp_wifi.h"
 #include "web_server.h"
+#include "sensor_processing.h"
 #include "esp_mac.h" 
 
 /* Access Point Configuration, this data may change */

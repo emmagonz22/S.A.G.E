@@ -210,4 +210,43 @@ esp_err_t start_web_server(void)
     httpd_register_uri_handler(server, &file_download);
 
     return ESP_OK;
-}
+
+//     /*URI Handler for Toggle Buttons*/
+//     httpd_uri_t start_uri = {
+//         .uri       = "/start_sensor",
+//         .method    = HTTP_GET,
+//         .handler   = start_button_handler,
+//         .user_ctx  = NULL
+// };
+// httpd_register_uri_handler(server, &start_uri);
+
+//     httpd_uri_t end_uri = {
+//         .uri       = "/end_sensor",
+//         .method    = HTTP_GET,
+//         .handler   = end_button_handler,
+//         .user_ctx  = NULL
+// };
+// httpd_register_uri_handler(server, &end_uri);
+
+
+}   
+
+// esp_err_t start_button_handler(httpd_req_t *req) {
+//     if (sensor_task_handle == NULL) {
+//         stopLogging = false;
+//         xTaskCreate(&sensor_task, "Sensor Task", 4096, NULL, 5, &sensor_task_handle);
+//         ESP_LOGI("WEB", "Sensor task started");
+//     }
+//     httpd_resp_send(req, "Sensor started", HTTPD_RESP_USE_STRLEN);
+//     return ESP_OK;
+// }
+
+// esp_err_t end_button_handler(httpd_req_t *req) {
+//     if (sensor_task_handle != NULL) {
+//         stopLogging = true;  // task will delete itself
+//         sensor_task_handle = NULL;
+//         ESP_LOGI("WEB", "Sensor task flagged to stop");
+//     }
+//     httpd_resp_send(req, "Sensor stopped", HTTPD_RESP_USE_STRLEN);
+//     return ESP_OK;
+// }
