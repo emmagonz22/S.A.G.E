@@ -79,75 +79,14 @@ void sensor_task(void *pvParameter){
     }
 }
 
-static const char *TAG1 = "SENSOR_MODULE";
-bool stopLogging = false;
-char csv_buffer[4096];  // ~4KB buffer for storing session
-size_t buffer_index = 0;
 
-// CSV Portion - Probaly should be moved to the sensor processing
-void append_csv_row(uint32_t timestamp, float moisture, float humidity, float soil_temp, float air_temp) {
-    // Append to buffer
-    buffer_index += snprintf(&csv_buffer[buffer_index],
-        sizeof(csv_buffer) - buffer_index,
-        "%lu,%.2f,%.2f,%.2f,%.2f\n",
-        timestamp, moisture, humidity, soil_temp, air_temp);
-
-    // Avoid buffer overflow
-    if (buffer_index >= sizeof(csv_buffer) - 100) {
-        ESP_LOGW(TAG1, "CSV buffer is almost full!");
-    }
-}
-
-void save_csv_to_flash() {
-    FILE *f = fopen("/storage/session_log.csv", "w");
-    if (f == NULL) {
-        ESP_LOGE(TAG1, "Failed to open file for writing");
-        return;
-    }
-    fprintf(f, "Timestamp,Moisture,Humidity,SoilTemp,AirTemp\n"); // Header
-    fwrite(csv_buffer, 1, buffer_index, f);
-    fclose(f);
-    ESP_LOGI(TAG1, "CSV file saved to /storage/session_log.csv");
-}
-
-
-void init_spiffs(void) {
-    esp_vfs_spiffs_conf_t conf = {
-      .base_path = "/storage",
-      .partition_label = "storage",
-      .max_files = 5,
-      .format_if_mount_failed = true
-    };
-
-    esp_err_t ret = esp_vfs_spiffs_register(&conf);
-
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG1, "Failed to mount or format filesystem");
-    } else {
-        ESP_LOGI(TAG1, "SPIFFS mounted successfully");
-    }
-}
-
-void read_csv_from_flash() {
-    FILE *f = fopen("/storage/session_log.csv", "r");
-    if (f == NULL) {
-        ESP_LOGE(TAG1, "Failed to open CSV file for reading");
-        return;
-    }
-
-    char line[128]; // Adjust buffer size as needed
-    while (fgets(line, sizeof(line), f)) {
-        ESP_LOGI(TAG1, "CSV: %s", line);  // Output to serial console
-    }
-
-    fclose(f);
-}
 
 
 //---------------------------------------------
 
 void app_main(void)
 {
+
     /* Initialize NVS */
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -172,18 +111,34 @@ void app_main(void)
     esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_AP"), &ip_info);
     ESP_LOGI("WIFI", "AP IP Address: " IPSTR, IP2STR(&ip_info.ip));
 
+    // CSV Creation
     sensor_init();
+    vTaskDelay(1000 / portTICK_PERIOD_MS);  // Wait for 1 second
+
     SensorData sensorValues = read_sensors();
 
 
     ESP_LOGI("SENSOR_MODULE", "Timestamp: %lu ms | Moisture: %.2f%% | Humidity: %.2f%% | Soil Temp: %.2f°C | Air Temp: %.2f°C", 
                  sensorValues.currentMillis, sensorValues.moisturePercent, sensorValues.humidity, sensorValues.temperatureDS18B20, sensorValues.temperatureDHT);
 
-    xTaskCreate(&sensor_task, "Sensor Task", 4096, NULL, 5, NULL);
+    TaskHandle_t sensorTaskHandle = NULL;
+    xTaskCreate(&sensor_task, "Sensor Task", 4096, NULL, 5, &sensorTaskHandle);
 
-    // CSV Creation
-    init_spiffs();
-    append_csv_row(sensorValues.currentMillis, sensorValues.moisturePercent, sensorValues.humidity, sensorValues.temperatureDS18B20, sensorValues.temperatureDHT);
+    //
+    //read_csv_from_flash();
+    vTaskDelay(1000 / portTICK_PERIOD_MS);  // Wait for 1 second
+
+
+
+    ESP_LOGI("SENSOR_MODULE", "CurrentMillis: %lu", sensorValues.currentMillis);
+    
+            ESP_LOGI("SENSOR_MODULE", "Saved to CSV");
+    
+    vTaskDelay(10000 / portTICK_PERIOD_MS);  // Wait for 10 second
     save_csv_to_flash();
+    vTaskDelay(2000 / portTICK_PERIOD_MS);  // Wait for 2 second
     read_csv_from_flash();
+
+    
+
 }
