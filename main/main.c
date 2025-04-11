@@ -7,6 +7,8 @@
 #include "esp_wifi.h"
 #include "web_server.h"
 #include "sensor_processing.h"
+#include "command_types.h"
+#include "freertos/queue.h"
 #include "esp_mac.h" 
 
 /* Access Point Configuration, this data may change */
@@ -17,6 +19,7 @@
 
 
 static const char *TAG = "main";
+QueueHandle_t command_queue;
 
 // https://esp32tutorials.com/esp32-access-point-ap-esp-idf/
 
@@ -68,6 +71,26 @@ void wifi_init_softap(void)
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 
+// All commands to the Internal Tool or the app shuld be done here.
+void main_command_handler(void *arg) {
+    CommandType cmd;
+
+    while (1) {
+        if (xQueueReceive(command_queue, &cmd, portMAX_DELAY)) {
+            switch (cmd) {
+                case CMD_START_SENSOR:
+                    start_sensor();  // From sensor_processing.c
+                    break;
+                case CMD_STOP_SENSOR:
+                    stop_sensor();   // From sensor_processing.c
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+}
+
 
 void app_main(void)
 {
@@ -87,7 +110,13 @@ void app_main(void)
     wifi_init_softap();
 
     /* Start web server */
-    ESP_ERROR_CHECK(start_web_server());
+    
+    command_queue = xQueueCreate(10, sizeof(CommandType));
+
+    xTaskCreate(main_command_handler, "CommandHandler", 4096, NULL, 5, NULL);
+
+    // Pass the queue to web server
+    ESP_ERROR_CHECK(start_web_server(command_queue));
     ESP_LOGI(TAG, "Web server started");
 
     esp_netif_ip_info_t ip_info;
@@ -95,4 +124,6 @@ void app_main(void)
     esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_AP"), &ip_info);
     ESP_LOGI("WIFI", "AP IP Address: " IPSTR, IP2STR(&ip_info.ip));
 
+    // Later: pass to app interface
 }
+

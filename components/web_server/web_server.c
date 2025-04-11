@@ -8,6 +8,7 @@
 #include "esp_vfs.h"
 #include "esp_spiffs.h"
 
+
 static const char *TAG = "web-server";
 
 /* Define file server root directory */
@@ -19,6 +20,14 @@ static const char *TAG = "web-server";
 
 /* Scratch buffer size */
 #define SCRATCH_BUFSIZE 8192
+
+/* Declare the Queue */
+static QueueHandle_t q;  // Declare q globally for use in multiple functions
+typedef enum {
+    CMD_START_SENSOR,
+    CMD_STOP_SENSOR
+} CommandType;
+
 
 struct file_server_data {
     char base_path[ESP_VFS_PATH_MAX + 1];
@@ -158,8 +167,30 @@ static esp_err_t init_spiffs(void)
     return ESP_OK;
 }
 
-esp_err_t start_web_server(void)
+static esp_err_t start_sensor_handler(httpd_req_t *req) {
+    QueueHandle_t q = (QueueHandle_t) req->user_ctx;
+
+    CommandType cmd = CMD_START_SENSOR;
+    xQueueSend(q, &cmd, portMAX_DELAY);
+    httpd_resp_send(req, "OK", HTTPD_RESP_USE_STRLEN);
+    ESP_LOGI(TAG, "Running");
+    return ESP_OK;
+}
+
+static esp_err_t stop_sensor_handler(httpd_req_t *req) {
+    QueueHandle_t q = (QueueHandle_t) req->user_ctx;
+
+    CommandType cmd = CMD_STOP_SENSOR;
+    xQueueSend(q, &cmd, portMAX_DELAY);
+    httpd_resp_send(req, "OK", HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+esp_err_t start_web_server(QueueHandle_t cmd_queue)
 {
+    // Initialize queue
+    q = cmd_queue;
+
     /* Initialize file storage */
     ESP_LOGI(TAG, "Starting web server");
     
@@ -200,6 +231,24 @@ esp_err_t start_web_server(void)
     };
     httpd_register_uri_handler(server, &root);
 
+    /*URI Handler for Toggle Buttons*/
+    httpd_uri_t start_uri = {
+        .uri       = "/start_sensor",
+        .method    = HTTP_GET,
+        .handler   = start_sensor_handler,
+        .user_ctx  = (void*) q
+};
+httpd_register_uri_handler(server, &start_uri);
+
+    httpd_uri_t end_uri = {
+        .uri       = "/end_sensor",
+        .method    = HTTP_GET,
+        .handler   = stop_sensor_handler,
+        .user_ctx  = (void*) q
+};
+httpd_register_uri_handler(server, &end_uri);
+
+
     /* URI handler for static files */
     httpd_uri_t file_download = {
         .uri = "/*",
@@ -211,42 +260,6 @@ esp_err_t start_web_server(void)
 
     return ESP_OK;
 
-//     /*URI Handler for Toggle Buttons*/
-//     httpd_uri_t start_uri = {
-//         .uri       = "/start_sensor",
-//         .method    = HTTP_GET,
-//         .handler   = start_button_handler,
-//         .user_ctx  = NULL
-// };
-// httpd_register_uri_handler(server, &start_uri);
-
-//     httpd_uri_t end_uri = {
-//         .uri       = "/end_sensor",
-//         .method    = HTTP_GET,
-//         .handler   = end_button_handler,
-//         .user_ctx  = NULL
-// };
-// httpd_register_uri_handler(server, &end_uri);
-
 
 }   
 
-// esp_err_t start_button_handler(httpd_req_t *req) {
-//     if (sensor_task_handle == NULL) {
-//         stopLogging = false;
-//         xTaskCreate(&sensor_task, "Sensor Task", 4096, NULL, 5, &sensor_task_handle);
-//         ESP_LOGI("WEB", "Sensor task started");
-//     }
-//     httpd_resp_send(req, "Sensor started", HTTPD_RESP_USE_STRLEN);
-//     return ESP_OK;
-// }
-
-// esp_err_t end_button_handler(httpd_req_t *req) {
-//     if (sensor_task_handle != NULL) {
-//         stopLogging = true;  // task will delete itself
-//         sensor_task_handle = NULL;
-//         ESP_LOGI("WEB", "Sensor task flagged to stop");
-//     }
-//     httpd_resp_send(req, "Sensor stopped", HTTPD_RESP_USE_STRLEN);
-//     return ESP_OK;
-// }
