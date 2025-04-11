@@ -46,5 +46,10 @@ SensorData read_sensors();
 float map_value(float x, float in_min, float in_max, float out_min, float out_max);
 float constrain_value(float value, float min_val, float max_val);
 
+void append_csv_row(uint32_t timestamp, float moisture, float humidity, float soil_temp, float air_temp);
+void save_csv_to_flash(void);
+void read_csv_from_flash();
+static esp_err_t init_spiffs(void);
+
 
 #endif // SENSOR_PROCESSING_H
