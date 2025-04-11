@@ -51,5 +51,7 @@ void save_csv_to_flash(void);
 void read_csv_from_flash();
 static esp_err_t init_spiffs(void);
 
-
+void sensor_task(void *pvParameters);
+void start_sensor();
+void stop_sensor();
 #endif // SENSOR_PROCESSING_H

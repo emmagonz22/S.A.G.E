@@ -15,6 +15,11 @@
 #include "esp_spiffs.h"
 #include <driver/adc.h>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+// Tasks
+static TaskHandle_t sensor_task_handle = NULL;
+
 // Initialize sensor instances
 // DHT dht(DHTPIN, DHTTYPE);
 // OneWire oneWire(ONE_WIRE_BUS);
@@ -85,7 +90,8 @@ SensorData read_sensors() {
         // Serial.print(data.temperatureDS18B20); Serial.print(", ");
         // Serial.println(data.temperatureDHT);
     }
-    
+    ESP_LOGI("SENSOR_MODULE", "Timestamp: %lu ms | Moisture: %.2f%% | Humidity: %.2f%% | Soil Temp: %.2f°C | Air Temp: %.2f°C", 
+                 data.currentMillis, data.moisturePercent, data.humidity, data.temperatureDS18B20, data.temperatureDHT);
     append_csv_row(data.currentMillis, data.moisturePercent, data.humidity, data.temperatureDS18B20, data.temperatureDHT);
     //read_csv_from_flash();
     return data;
@@ -193,4 +199,37 @@ void read_csv_from_flash() {
     }
 
     fclose(f);
+}
+
+// Define maint ask functions: To be used by main.c
+
+void sensor_task(void *pvParameters) {
+    while (1) {
+        SensorData data = read_sensors();
+        ESP_LOGI(TAG1, "read_sensors was executed.");
+        if (stopLogging) {
+            vTaskSuspend(NULL);  // Suspend this task until resumed
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Delay 1 second
+    }
+}
+
+void start_sensor() {
+    if (sensor_task_handle == NULL) {
+        xTaskCreate(sensor_task, "sensor_task", 4096, NULL, 5, &sensor_task_handle);
+        ESP_LOGI(TAG1, "Sensor task started.");
+    } else {
+        vTaskResume(sensor_task_handle);
+        ESP_LOGI(TAG1, "Sensor task resumed.");
+    }
+}
+
+void stop_sensor() {
+    if (sensor_task_handle != NULL) {
+        vTaskSuspend(sensor_task_handle);
+        ESP_LOGI(TAG1, "Sensor task suspended.");
+        save_csv_to_flash();
+        read_csv_from_flash();
+    }
 }
