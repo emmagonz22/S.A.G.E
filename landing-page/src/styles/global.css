@@ -1,0 +1,143 @@
+@import "tailwindcss";
+
+
+:root {
+    --color-bg: #fff;
+    --color-border: #f0f0f0;
+    --color-text: rgba(0, 0, 0, 0.65);
+    --color-hover: #71c44a;
+    --color-selected: #519631;
+    --color-primary: #519631;
+}
+
+
+
+/* Navigation container */
+.navigation-container {
+    width: 100%;
+}
+
+
+.desktop-nav { display: flex; }
+.mobile-nav { display: none; }
+@media screen and (max-width: 767px) {
+    .desktop-nav { display: none; }
+    .mobile-nav { display: block; }
+}
+
+
+/* Desktop horizontal menu */
+.menu-horizontal {
+    display: flex;
+    background-color: var(--color-bg);
+    /*border-bottom: 1px solid var(--color-border);*/
+    justify-content: center;
+    width: 100%;
+
+}
+
+.menu-horizontal ul {
+    display: flex;
+    list-style: none;
+    width: 100%;
+    justify-content: space-around;
+}
+
+.menu-item {
+    padding: 0 20px;
+    line-height: 64px;
+    font-size: 14px;
+    color: var(--color-text);
+    cursor: pointer;
+    transition: color 0.3s, border-bottom 0.3s;
+    caret-color: transparent;
+}
+
+.menu-item:hover {
+    color: var(--color-hover);
+}
+
+.menu-item-selected {
+    color: var(--color-selected);
+    border-bottom: 2px solid var(--color-selected);
+}
+
+/* Mobile vertical menu */
+.menu-vertical {
+    background-color: var(--color-bg);
+    position: fixed;
+    right: 0;
+    width: 100%; /* Take up 70% of the screen width */
+    height: calc(100vh); /* Full height minus header */
+    border-left: 1px solid var(--color-border);
+    z-index: 1000;
+    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+    transform: translateX(0);
+    transition: transform 0.3s ease-in-out;
+}
+
+.menu-vertical ul {
+    display: flex;
+    flex-direction: column;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+
+.menu-vertical .menu-item {
+
+    font-size: 16px;
+    border-bottom: 1px solid var(--color-border);
+
+    width: 100%;
+    display: block; /* Ensure it's a block element */
+    box-sizing: border-box; /* Include padding in width calculation */
+}
+
+/* Mobile Navigation */
+.mobile-nav {
+    position: relative;    
+}
+
+.mobile-nav .mobile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    padding: 0 20px;
+    height: 64px;
+    position: relative;
+    z-index: 1001; /* Above the mobile menu */
+}
+
+.hamburger {
+    font-size: 30px;
+    cursor: pointer;
+    z-index: 1002; /* Above everything else */
+}
+
+/* Mobile menu closed state */
+.mobile-menu-closed {
+    transform: translateX(100%); /* Move off-screen to the right */
+}
+
+/* Overlay for mobile menu */
+.mobile-overlay {
+    position: fixed;
+    top: 64px;
+    left: 0;
+    width: 100%;
+    height: calc(100vh - 64px);
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.mobile-overlay-visible {
+    opacity: 1;
+    visibility: visible;
+}
