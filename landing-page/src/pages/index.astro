@@ -1,0 +1,96 @@
+---
+import "../styles/global.css";
+import Layout from '../layouts/Layout.astro';
+import { Button } from "antd";
+---
+
+<Layout>
+
+    <div class="flex flex-col min-h-screen">
+        <div class="w-full title-box flex flex-col items-center justify-center px-8">
+            <span class="w-full flex flex-col justify-center">
+                <h1 class="text-center">S.A.G.E</h1>
+                <h2 class="text-center">Soil Analysis & Ground Evaluation</h2>
+            </span>
+        
+            <div class="w-full flex justify-center mt-24">
+                <Button className="btn" client:only type="primary">Download Progress Report</Button>
+                    <!--
+                <div>
+                    <Button client:only></Button>
+                    <Button client:only></Button>
+                    <Button client:only></Button>
+                </div>
+                -->
+            </div>
+        </div>
+
+        <div class="w-full h-full flex flex-col items-center justify-center py-30 px-20">
+                <h3 class="text-center">Objective</h3>
+                <p> Lorem ipsum dolor, sit amet consectetur adipisicing elit. Consectetur natus nemo numquam ratione officia nihil cumque itaque voluptatibus, facere, exercitationem recusandae quisquam alias et quas vero expedita iste architecto sapiente?</p>
+        </div>
+ 
+    </div>
+
+</Layout>
+
+
+<style>
+
+    :root {
+        --color-bg: #fff;
+        --color-border: #f0f0f0;
+        --color-text: rgba(0, 0, 0, 0.65);
+        --color-hover: #71c44a;
+        --color-selected: #519631;
+        --color-primary: #519631;
+    }
+
+    @layer base {
+        h1 {
+            font-size: var(--text-8xl);
+            @media screen and (max-width: 768px) {
+                font-size: var(--text-6xl);
+            }
+            font-family: "Ubuntu sans", sans-serif;
+            font-weight: 900;
+            color: white;
+        }
+        h2 {
+            font-size: var(--text-3xl);
+            @media screen and (max-width: 768px) {
+                font-size: var(--text-2xl);
+            }
+            font-family: "Ubuntu sans", sans-serif;
+            font-weight: 700;
+            color: white;
+            text-shadow: 1px 1px 4px #000000;
+
+        }
+        h3 {
+            font-size: var(--text-3xl);
+            font-family: "Ubuntu sans", sans-serif;
+        }
+        a {
+            color: var(--color-blue-600);
+            text-decoration-line: underline;
+        }
+    }
+
+    .btn{
+        background-color: var(--color-primary);
+        font-family: 'Inter', sans-serif;
+        min-height: 40px;
+    }
+    .btn:hover{
+        background-color: var(--color-hover) !important;
+    }
+    .title-box {
+        background-image: url('../assets/background_index.jpg');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        width: 100%;
+        height: calc(100vh - 64px);
+    }
+</style>
