@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View } from 'tamagui';
 import { useTheme } from '@/context/ThemeProvider';
 export default function BlurTabBarBackground() {
-  const {isDarkMode, toggleTheme} = useTheme();
+  const {isDarkMode} = useTheme();
 
   const { bottom } = useSafeAreaInsets();
   return (
@@ -24,7 +24,7 @@ export default function BlurTabBarBackground() {
       ]}>
       <BlurView tint={isDarkMode ? "dark" : "light"} intensity={100} style={StyleSheet.absoluteFill} />
       <View
-        backgroundColor="$background"
+        backgroundColor={isDarkMode ? "$color3" : "$background"}
         opacity={0.3} // Adjust overlay intensity
         style={StyleSheet.absoluteFill}
       />
