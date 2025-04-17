@@ -2,11 +2,11 @@ import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
 import { StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, useTheme } from 'tamagui';
-
+import { View } from 'tamagui';
+import { useTheme } from '@/context/ThemeProvider';
 export default function BlurTabBarBackground() {
-  
-  const theme = useTheme();
+  const {isDarkMode, toggleTheme} = useTheme();
+
   const { bottom } = useSafeAreaInsets();
   return (
 
@@ -22,7 +22,7 @@ export default function BlurTabBarBackground() {
           overflow: 'hidden', // Needed for borderRadius to apply to BlurView
         },
       ]}>
-      <BlurView tint="light" intensity={100} style={StyleSheet.absoluteFill} />
+      <BlurView tint={isDarkMode ? "dark" : "light"} intensity={100} style={StyleSheet.absoluteFill} />
       <View
         backgroundColor="$background"
         opacity={0.3} // Adjust overlay intensity
