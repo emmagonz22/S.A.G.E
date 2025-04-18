@@ -131,8 +131,22 @@ void append_csv_row(uint32_t timestamp, float moisture, float humidity, float so
     }
 }
 
-void save_csv_to_flash() {
-    FILE *f = fopen("/csv_logs/session_log.csv", "w");
+void save_csv_to_flash(char *name) {
+
+    char file_path[128]; // "/csv_logs/" + name + "_session_log.csv"
+
+    // Format the file path string
+    
+    if (name == NULL) {
+        snprintf(file_path, sizeof(file_path), "/csv_logs/session_log.csv");
+    }
+
+    else {
+        snprintf(file_path, sizeof(file_path), "/csv_logs/%s_session_log.csv", name);
+    }
+
+
+    FILE *f = fopen(file_path, "w");
     if (f == NULL) {
         ESP_LOGE(TAG1, "Failed to open file for writing");
         return;
@@ -140,7 +154,7 @@ void save_csv_to_flash() {
     fprintf(f, "Timestamp,Moisture,Humidity,SoilTemp,AirTemp\n"); // Header
     fwrite(csv_buffer, 1, buffer_index, f);
     fclose(f);
-    ESP_LOGI(TAG1, "CSV file saved to /storage/session_log.csv");
+    ESP_LOGI(TAG1, "CSV file saved to %s", file_path);
 }
 
 
@@ -181,13 +195,25 @@ static esp_err_t init_spiffs(void)
 }
 
 // CSV Portion 
-void read_csv_from_flash() {
+void read_csv_from_flash(char *name) {
     // if (!esp_spiffs_mounted("/csv_logs")) {
     //     ESP_LOGE(TAG1, "SPIFFS is not mounted, cannot read CSV");
     //     return;
     // }
 
-    FILE *f = fopen("/csv_logs/session_log.csv", "r");
+    char file_path[128]; // "/csv_logs/" + name + "_session_log.csv"
+
+    // Format the file path string
+    
+    if (name == NULL) {
+        snprintf(file_path, sizeof(file_path), "/csv_logs/session_log.csv");
+    }
+
+    else {
+        snprintf(file_path, sizeof(file_path), "/csv_logs/%s_session_log.csv", name);
+    }
+
+    FILE *f = fopen(file_path, "r");
     if (f == NULL) {
         ESP_LOGE(TAG1, "Failed to open CSV file for reading");
         return;
@@ -224,12 +250,11 @@ void start_sensor() {
         ESP_LOGI(TAG1, "Sensor task resumed.");
     }
 }
-
-void stop_sensor() {
+void stop_sensor(char *name) {
     if (sensor_task_handle != NULL) {
         vTaskSuspend(sensor_task_handle);
-        ESP_LOGI(TAG1, "Sensor task suspended.");
-        save_csv_to_flash();
-        read_csv_from_flash();
+        ESP_LOGI(TAG1, "Sensor task suspended. Device Name: %s", name);
+        save_csv_to_flash(name);
+        read_csv_from_flash(name);
     }
 }
