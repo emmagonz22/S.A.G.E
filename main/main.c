@@ -71,6 +71,10 @@ void wifi_init_softap(void)
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 
+void set_name_device(){
+    ESP_LOGI("Naming Module", "name_start");
+}
+
 // All commands to the Internal Tool or the app shuld be done here.
 void main_command_handler(void *arg) {
     CommandType cmd;
@@ -83,6 +87,9 @@ void main_command_handler(void *arg) {
                     break;
                 case CMD_STOP_SENSOR:
                     stop_sensor();   // From sensor_processing.c
+                    break;
+                case CMD_SET_NAME:
+                    set_name_device();
                     break;
                 default:
                     break;

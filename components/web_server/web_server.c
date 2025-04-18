@@ -8,6 +8,9 @@
 #include "esp_vfs.h"
 #include "esp_spiffs.h"
 
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
 
 static const char *TAG = "web-server";
 
@@ -25,7 +28,8 @@ static const char *TAG = "web-server";
 static QueueHandle_t q;  // Declare q globally for use in multiple functions
 typedef enum {
     CMD_START_SENSOR,
-    CMD_STOP_SENSOR
+    CMD_STOP_SENSOR,
+    CMD_SET_NAME
 } CommandType;
 
 
@@ -186,6 +190,49 @@ static esp_err_t stop_sensor_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+// static esp_err_t set_name_handler(httpd_req_t *req) {
+//     QueueHandle_t q = (QueueHandle_t) req->user_ctx;
+
+//     CommandType cmd = CMD_SET_NAME;
+//     xQueueSend(q, &cmd, portMAX_DELAY);
+//     httpd_resp_send(req, "OK", HTTPD_RESP_USE_STRLEN);
+//     return ESP_OK;
+// }
+
+static esp_err_t set_name_handler(httpd_req_t *req) {
+    QueueHandle_t q = (QueueHandle_t) req->user_ctx;
+
+    // Allocate buffer for the incoming JSON payload
+    char buf[100];  // adjust size as needed
+    int ret = httpd_req_recv(req, buf, MIN(req->content_len, sizeof(buf) - 1));
+    if (ret <= 0) {
+        return ESP_FAIL;
+    }
+    buf[ret] = '\0';  // Null-terminate
+
+    // Log or parse the name
+    ESP_LOGI("SET_NAME", "Received: %s", buf);
+
+    // Assuming { "name": "Device123" }
+    char *name_start = strstr(buf, "\"name\":");
+    if (name_start) {
+        name_start += 7;
+        while (*name_start == ' ' || *name_start == '\"' || *name_start == ':') name_start++;
+        char *name_end = strchr(name_start, '\"');
+        if (name_end) {
+            *name_end = '\0';
+            ESP_LOGI("SET_NAME", "Extracted name: %s", name_start);
+        }
+    }
+
+    CommandType cmd = CMD_SET_NAME;
+    xQueueSend(q, &cmd, portMAX_DELAY);
+
+    httpd_resp_send(req, "OK", HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+
 esp_err_t start_web_server(QueueHandle_t cmd_queue)
 {
     // Initialize queue
@@ -248,6 +295,13 @@ httpd_register_uri_handler(server, &start_uri);
 };
 httpd_register_uri_handler(server, &end_uri);
 
+    httpd_uri_t name_uri = {
+        .uri       = "/set_name",
+        .method    = HTTP_POST,
+        .handler   = set_name_handler,
+        .user_ctx  = (void*) q
+};
+httpd_register_uri_handler(server, &name_uri);
 
     /* URI handler for static files */
     httpd_uri_t file_download = {

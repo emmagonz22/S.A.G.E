@@ -17,3 +17,23 @@ function themeHandler() {
         }
     };
 }
+
+function setDeviceName() {
+    const deviceName = document.getElementById("DeviceName").value;
+
+    fetch('/set_name', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: deviceName })
+    })
+    .then(response => {
+        if (response.ok) {
+            console.log("Device name set successfully.");
+        } else {
+            console.error("Failed to set device name.");
+        }
+    })
+    .catch(error => console.error("Error:", error));
+}
