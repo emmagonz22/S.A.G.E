@@ -33,6 +33,13 @@ typedef enum {
 } CommandType;
 
 
+typedef struct {
+    CommandType type;
+    char payload[64];  
+} CommandMessage;
+
+
+
 struct file_server_data {
     char base_path[ESP_VFS_PATH_MAX + 1];
     char scratch[SCRATCH_BUFSIZE];
@@ -224,9 +231,13 @@ static esp_err_t set_name_handler(httpd_req_t *req) {
             ESP_LOGI("SET_NAME", "Extracted name: %s", name_start);
         }
     }
+    CommandMessage msg = {
+        .type = CMD_SET_NAME
+        };
+    strncpy(msg.payload, name_start, sizeof(msg.payload) - 1);
+    msg.payload[sizeof(msg.payload) - 1] = '\0'; // safe null-termination
 
-    CommandType cmd = CMD_SET_NAME;
-    xQueueSend(q, &cmd, portMAX_DELAY);
+    xQueueSend(q, &msg, portMAX_DELAY);
 
     httpd_resp_send(req, "OK", HTTPD_RESP_USE_STRLEN);
     return ESP_OK;

@@ -70,26 +70,34 @@ void wifi_init_softap(void)
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 }
-
-void set_name_device(){
-    ESP_LOGI("Naming Module", "name_start");
+char name_device[64] = {0};  // Safe fixed-size buffer
+void set_name_device(char *name) {
+    if (name != NULL) {
+        strncpy(name_device, name, 64 - 1);
+        name_device[64 - 1] = '\0';  // Null-terminate just in case
+        ESP_LOGI("Naming Module", "Device name set to: %s", name_device);
+    } else {
+        ESP_LOGW("Naming Module", "Received NULL name!");
+        name_device[0] = '\0';
+    }
 }
+
 
 // All commands to the Internal Tool or the app shuld be done here.
 void main_command_handler(void *arg) {
-    CommandType cmd;
+    CommandMessage msg;
 
     while (1) {
-        if (xQueueReceive(command_queue, &cmd, portMAX_DELAY)) {
-            switch (cmd) {
+        if (xQueueReceive(command_queue, &msg, portMAX_DELAY)) {
+            switch (msg.type) {
                 case CMD_START_SENSOR:
                     start_sensor();  // From sensor_processing.c
                     break;
                 case CMD_STOP_SENSOR:
-                    stop_sensor();   // From sensor_processing.c
+                    stop_sensor(name_device);   // From sensor_processing.c
                     break;
                 case CMD_SET_NAME:
-                    set_name_device();
+                    set_name_device(msg.payload); // Passign the Name
                     break;
                 default:
                     break;
@@ -118,7 +126,7 @@ void app_main(void)
 
     /* Start web server */
     sensor_init();
-    command_queue = xQueueCreate(10, sizeof(CommandType));
+    command_queue = xQueueCreate(10, sizeof(CommandMessage));
 
     xTaskCreate(main_command_handler, "CommandHandler", 4096, NULL, 5, NULL);
 
