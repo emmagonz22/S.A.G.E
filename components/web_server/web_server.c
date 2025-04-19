@@ -243,6 +243,46 @@ static esp_err_t set_name_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+#define MAX_NAME_LEN 128 
+static esp_err_t list_logs_handler(httpd_req_t *req) {
+    struct dirent *entry;
+    DIR *dir = opendir("/csv_logs");
+
+    if (!dir) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr_chunk(req, "[");
+    bool first = true;
+
+    while ((entry = readdir(dir)) != NULL) {
+        if (strstr(entry->d_name, ".csv")) {
+            if (!first) {
+                httpd_resp_sendstr_chunk(req, ",");
+            }
+            first = false;
+
+        char file_name[MAX_NAME_LEN + 1];
+        strncpy(file_name, entry->d_name, MAX_NAME_LEN);
+        file_name[MAX_NAME_LEN] = '\0';  // Null-terminate
+
+        char json_entry[512];
+        snprintf(json_entry, sizeof(json_entry),
+            "{\"fileName\":\"%s\",\"id\":\"%s\"}",
+            file_name, file_name);
+            httpd_resp_sendstr_chunk(req, json_entry);
+        }
+    }
+
+    httpd_resp_sendstr_chunk(req, "]");
+    httpd_resp_sendstr_chunk(req, NULL);  // End response
+    closedir(dir);
+    return ESP_OK;
+}
+
+
 
 esp_err_t start_web_server(QueueHandle_t cmd_queue)
 {
@@ -313,6 +353,14 @@ httpd_register_uri_handler(server, &end_uri);
         .user_ctx  = (void*) q
 };
 httpd_register_uri_handler(server, &name_uri);
+
+httpd_uri_t list_logs_uri = {
+    .uri       = "/logs/list",
+    .method    = HTTP_GET,
+    .handler   = list_logs_handler,
+    .user_ctx  = NULL
+};
+httpd_register_uri_handler(server, &list_logs_uri);
 
     /* URI handler for static files */
     httpd_uri_t file_download = {
