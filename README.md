@@ -1,5 +1,10 @@
 # S.A.G.E
 
+<p align="center">
+  <img src="./SAGE_logo.png" alt="SAGE Logo" width="300">
+</p>
+
+
 ## Getting started
 
 Install IDF toolchain
