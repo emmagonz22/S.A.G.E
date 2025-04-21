@@ -15,7 +15,7 @@
 static const char *TAG = "web-server";
 
 /* Define file server root directory */
-#define FILE_SYSTEM_BASE_PATH "/storage"
+#define FILE_SYSTEM_BASE_PATH "/csv_logs"
 #define FILE_SERVER_BASE_PATH "/"
 
 /* Max size of a file path */
@@ -75,6 +75,8 @@ static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filepa
         type = "image/svg+xml";
     } else if (strstr(filepath, ".json")) {
         type = "application/json";
+    } else if (strstr(filepath, ".csv")) {
+        type = "text/csv";
     }
     
     return httpd_resp_set_type(req, type);
@@ -89,20 +91,36 @@ static esp_err_t file_get_handler(httpd_req_t *req)
     struct file_server_data *server_data = req->user_ctx;
 
     const char *filename = req->uri;
+
+    // block to strip query strings
+    char clean_uri[128];
+    char *query = strchr(filename, '?');
+    if (query) {
+        size_t len = query - filename;
+        if (len >= sizeof(clean_uri)) len = sizeof(clean_uri) - 1;
+        strncpy(clean_uri, filename, len);
+        clean_uri[len] = '\0';
+        filename = clean_uri;
+    }
+
     if (strcmp(filename, "/") == 0) {
         filename = "/index.html";
     }
 
-    // Base lenght of the path
     size_t base_len = strlen(server_data->base_path);
-    // If the base lenght of the path plus the filename is biggeer than the file path return an error 
     if (base_len + strlen(filename) + 1 > FILE_PATH_MAX) {
         ESP_LOGE(TAG, "Path too long");
         return ESP_FAIL;
     }
-    // Concatenate the base path with the filename
-    strcpy(filepath, server_data->base_path);
-    strcat(filepath, filename);
+
+// Avoid double base path (e.g., /csv_logs/csv_logs)
+const char *relative_path = filename;
+if (strncmp(filename, server_data->base_path, strlen(server_data->base_path)) == 0) {
+    relative_path = filename + strlen(server_data->base_path);
+}
+
+strcpy(filepath, server_data->base_path);
+strcat(filepath, relative_path);
 
 
     if (stat(filepath, &file_stat) == -1) {
@@ -121,7 +139,6 @@ static esp_err_t file_get_handler(httpd_req_t *req)
     ESP_LOGI(TAG, "Sending file : %s (%ld bytes)", filepath, file_stat.st_size);
     set_content_type_from_file(req, filepath);
 
-    /* Read file and send in chunks */
     size_t chunksize;
     do {
         chunksize = fread(server_data->scratch, 1, SCRATCH_BUFSIZE, fd);
@@ -136,11 +153,12 @@ static esp_err_t file_get_handler(httpd_req_t *req)
         }
     } while (chunksize != 0);
 
-    /* Close file after sending complete */
     fclose(fd);
     httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
 }
+
+
 
 /* Initialize SPIFFS */
 static esp_err_t init_spiffs(void)
@@ -148,10 +166,10 @@ static esp_err_t init_spiffs(void)
     ESP_LOGI(TAG, "Initializing SPIFFS");
 
     esp_vfs_spiffs_conf_t conf = {
-        .base_path = FILE_SYSTEM_BASE_PATH,
-        .partition_label = "storage",
+        .base_path = "/csv_logs",
+        .partition_label = "csv_logs",
         .max_files = 5,
-        .format_if_mount_failed = false
+        .format_if_mount_failed = true
     };
 
     esp_err_t ret = esp_vfs_spiffs_register(&conf);
@@ -167,7 +185,7 @@ static esp_err_t init_spiffs(void)
     }
 
     size_t total = 0, used = 0;
-    ret = esp_spiffs_info("storage", &total, &used);
+    ret = esp_spiffs_info("csv_logs", &total, &used);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to get SPIFFS partition information (%s)", esp_err_to_name(ret));
         return ESP_FAIL;

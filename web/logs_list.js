@@ -72,6 +72,8 @@ function logsHandler() {
 
         goToLog(logId) {
             window.location.href = `log.html?id=${logId}`;
+            //window.location.href = `log.html`;
+
         },
 
     };

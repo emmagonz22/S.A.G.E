@@ -43,7 +43,7 @@ void sensor_init() {
     // Serial.println("Timestamp (ms), Soil Moisture (%), Air Humidity (%), Soil Temp (°C), Air Temp (°C)");
     adc1_config_width(ADC_WIDTH_BIT_12);  // 12-bit resolution (0 - 4095)
     adc1_config_channel_atten(ANALOG_SENSOR_PIN_MOISTURE, ADC_ATTEN_DB_11); // Full voltage range (0-3.3V)
-    init_spiffs();
+    // init_spiffs();
 }
 
 SensorData read_sensors() {
@@ -158,41 +158,41 @@ void save_csv_to_flash(char *name) {
 }
 
 
-/* Initialize SPIFFS */
-static esp_err_t init_spiffs(void)
-{
-    ESP_LOGI(TAG1, "Initializing SPIFFS");
+// /* Initialize SPIFFS */
+// static esp_err_t init_spiffs(void)
+// {
+//     ESP_LOGI(TAG1, "Initializing SPIFFS");
 
-    esp_vfs_spiffs_conf_t conf = {
-        .base_path = "/csv_logs",
-        .partition_label = "csv_logs",
-        .max_files = 5,
-        .format_if_mount_failed = true
-    };
+//     esp_vfs_spiffs_conf_t conf = {
+//         .base_path = "/csv_logs",
+//         .partition_label = "csv_logs",
+//         .max_files = 5,
+//         .format_if_mount_failed = true
+//     };
 
-    esp_err_t ret = esp_vfs_spiffs_register(&conf);
-    if (ret != ESP_OK) {
-        if (ret == ESP_FAIL) {
-            ESP_LOGE(TAG1, "Failed to mount or format filesystem");
-        } else if (ret == ESP_ERR_NOT_FOUND) {
-            ESP_LOGE(TAG1, "Failed to find CSV partition");
-        } else {
-            ESP_LOGE(TAG1, "Failed to initialize CSV SPIFFS (%s)", esp_err_to_name(ret));
-        }
-        return ESP_FAIL;
-    }
+//     esp_err_t ret = esp_vfs_spiffs_register(&conf);
+//     if (ret != ESP_OK) {
+//         if (ret == ESP_FAIL) {
+//             ESP_LOGE(TAG1, "Failed to mount or format filesystem");
+//         } else if (ret == ESP_ERR_NOT_FOUND) {
+//             ESP_LOGE(TAG1, "Failed to find CSV partition");
+//         } else {
+//             ESP_LOGE(TAG1, "Failed to initialize CSV SPIFFS (%s)", esp_err_to_name(ret));
+//         }
+//         return ESP_FAIL;
+//     }
 
-    size_t total = 0, used = 0;
-    ret = esp_spiffs_info("csv_logs", &total, &used);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG1, "Failed to get CSV SPIFFS partition information (%s)", esp_err_to_name(ret));
-        return ESP_FAIL;
-    } else {
-        ESP_LOGI(TAG1, "Partition size: total: %d, used: %d", total, used);
-    }
+//     size_t total = 0, used = 0;
+//     ret = esp_spiffs_info("csv_logs", &total, &used);
+//     if (ret != ESP_OK) {
+//         ESP_LOGE(TAG1, "Failed to get CSV SPIFFS partition information (%s)", esp_err_to_name(ret));
+//         return ESP_FAIL;
+//     } else {
+//         ESP_LOGI(TAG1, "Partition size: total: %d, used: %d", total, used);
+//     }
     
-    return ESP_OK;
-}
+//     return ESP_OK;
+// }
 
 // CSV Portion 
 void read_csv_from_flash(char *name) {

@@ -49,7 +49,7 @@ float constrain_value(float value, float min_val, float max_val);
 void append_csv_row(uint32_t timestamp, float moisture, float humidity, float soil_temp, float air_temp);
 void save_csv_to_flash(char *name);
 void read_csv_from_flash(char *name);
-static esp_err_t init_spiffs(void);
+// static esp_err_t init_spiffs(void);
 
 void sensor_task(void *pvParameters);
 void start_sensor();
