@@ -300,6 +300,100 @@ static esp_err_t list_logs_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+// Summarize log entries into an average of all scans
+static esp_err_t get_log_summary_handler(httpd_req_t *req)
+{
+    char query[100];
+    char file_id[64] = "Test_s_log.csv";  // default fallback
+
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        httpd_query_key_value(query, "id", file_id, sizeof(file_id));
+    }
+
+    char filepath[FILE_PATH_MAX];
+    snprintf(filepath, sizeof(filepath), "/csv_logs/%s", file_id);
+
+    FILE *fp = fopen(filepath, "r");
+    if (!fp) {
+        ESP_LOGE(TAG, "Failed to open CSV file: %s", filepath);
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "CSV file not found");
+        return ESP_FAIL;
+    }
+
+    char line[512];
+    int col_index[5] = {-1, -1, -1, -1, -1}; // Indexes for Moisture, Humidity, SoilTemp, AirTemp, Unknown
+    const char *col_names[5] = {"Moisture", "Humidity", "SoilTemp", "AirTemp", "Unknown"};
+    float sum[5] = {0};
+    int count[5] = {0};
+    bool header_parsed = false;
+
+    while (fgets(line, sizeof(line), fp)) {
+        line[strcspn(line, "\r\n")] = 0;
+        if (strlen(line) < 3) continue;
+
+        if (!header_parsed) {
+            // Parse header and store column indexes
+            int i = 0;
+            char *token = strtok(line, ",");
+            while (token != NULL) {
+                for (int j = 0; j < 5; j++) {
+                    if (col_index[j] == -1 && strcmp(token, col_names[j]) == 0) {
+                        col_index[j] = i;
+                    }
+                }
+                i++;
+                token = strtok(NULL, ",");
+            }
+            header_parsed = true;
+            continue;
+        }
+
+        // Parse data row
+        char *token_array[20] = {0};  // up to 20 columns
+        int col = 0;
+        char *token = strtok(line, ",");
+        while (token != NULL && col < 20) {
+            token_array[col++] = token;
+            token = strtok(NULL, ",");
+        }
+
+        // Use index map to extract values
+        for (int j = 0; j < 5; j++) {
+            int idx = col_index[j];
+            if (idx >= 0 && idx < col) {
+                char *val_str = token_array[idx];
+                char *endptr;
+                float val = strtof(val_str, &endptr);
+                if (endptr != val_str) {
+                    sum[j] += val;
+                    count[j]++;
+                }
+            }
+        }
+    }
+    fclose(fp);
+
+    // Format output values
+    char avg[5][16];
+    for (int i = 0; i < 5; i++) {
+        if (count[i]) {
+            snprintf(avg[i], sizeof(avg[i]), "%.2f", sum[i] / count[i]);
+        } else {
+            strcpy(avg[i], "#");
+        }
+    }
+
+    char response[256];
+    snprintf(response, sizeof(response),
+        "{\"Moisture\": \"%s\", \"Humidity\": \"%s\", \"SoilTemp\": \"%s\", \"AirTemp\": \"%s\", \"Unknown\": \"%s\"}",
+        avg[0], avg[1], avg[2], avg[3], avg[4]);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+
 
 
 esp_err_t start_web_server(QueueHandle_t cmd_queue)
@@ -379,6 +473,15 @@ httpd_uri_t list_logs_uri = {
     .user_ctx  = NULL
 };
 httpd_register_uri_handler(server, &list_logs_uri);
+
+httpd_uri_t log_summary_uri = {
+    .uri       = "/api/log_summary",
+    .method    = HTTP_GET,
+    .handler   = get_log_summary_handler,
+    .user_ctx  = server_data
+};
+httpd_register_uri_handler(server, &log_summary_uri);
+
 
     /* URI handler for static files */
     httpd_uri_t file_download = {

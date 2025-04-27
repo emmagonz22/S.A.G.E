@@ -138,11 +138,11 @@ void save_csv_to_flash(char *name) {
     // Format the file path string
     
     if (name == NULL) {
-        snprintf(file_path, sizeof(file_path), "/csv_logs/session_log.csv");
+        snprintf(file_path, sizeof(file_path), "/csv_logs/s_log.csv");
     }
 
     else {
-        snprintf(file_path, sizeof(file_path), "/csv_logs/%s_session_log.csv", name);
+        snprintf(file_path, sizeof(file_path), "/csv_logs/%s_s_log.csv", name);
     }
 
 
@@ -206,11 +206,11 @@ void read_csv_from_flash(char *name) {
     // Format the file path string
     
     if (name == NULL) {
-        snprintf(file_path, sizeof(file_path), "/csv_logs/session_log.csv");
+        snprintf(file_path, sizeof(file_path), "/csv_logs/s_log.csv");
     }
 
     else {
-        snprintf(file_path, sizeof(file_path), "/csv_logs/%s_session_log.csv", name);
+        snprintf(file_path, sizeof(file_path), "/csv_logs/%s_s_log.csv", name);
     }
 
     FILE *f = fopen(file_path, "r");
