@@ -1,7 +1,9 @@
-# S.A.G.E
-
 <p align="center">
   <img src="./SAGE_logo.png" alt="SAGE Logo" width="300">
+</p>
+
+<p align="center">
+  Soil Analysis & Ground Evaluation System
 </p>
 
 
