@@ -393,7 +393,55 @@ static esp_err_t get_log_summary_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t get_all_logs_handler(httpd_req_t *req) {
+    httpd_resp_set_type(req, "application/json");
 
+    DIR *dir = opendir("/csv_logs");
+    if (!dir) {
+        ESP_LOGE("web_server", "Failed to open dir");
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    struct dirent *entry;
+    struct stat file_stat;
+
+    char json_buffer[1024];  // Adjust as needed
+    size_t offset = 0;
+
+    offset += snprintf(json_buffer + offset, sizeof(json_buffer) - offset, "{ \"logs\": [");
+
+    bool first = true;
+    while ((entry = readdir(dir)) != NULL) {
+        // Build full path to the file
+        char filepath[300];
+        snprintf(filepath, sizeof(filepath), "/spiffs/csv_logs/%s", entry->d_name);
+
+        if (stat(filepath, &file_stat) == 0 && S_ISREG(file_stat.st_mode)) {
+            if (!first) {
+                offset += snprintf(json_buffer + offset, sizeof(json_buffer) - offset, ",");
+            }
+            first = false;
+
+            // Convert last modified time to a string
+            struct tm *tm_info = localtime(&file_stat.st_mtime);
+            char time_str[64];
+            strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tm_info);
+
+            // Add to JSON object
+            offset += snprintf(json_buffer + offset, sizeof(json_buffer) - offset,
+                "{\"name\":\"%s\",\"date\":\"%s\"}",
+                entry->d_name, time_str);
+        }
+    }
+
+    closedir(dir);
+
+    offset += snprintf(json_buffer + offset, sizeof(json_buffer) - offset, "] }");
+
+    httpd_resp_send(req, json_buffer, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
 
 
 esp_err_t start_web_server(QueueHandle_t cmd_queue)
@@ -481,6 +529,15 @@ httpd_uri_t log_summary_uri = {
     .user_ctx  = server_data
 };
 httpd_register_uri_handler(server, &log_summary_uri);
+
+httpd_uri_t get_all_logs_uri = {
+    .uri       = "/getAllLogs",
+    .method    = HTTP_GET,
+    .handler   = list_logs_handler,
+    .user_ctx  = NULL
+};
+
+httpd_register_uri_handler(server, &get_all_logs_uri);
 
 
     /* URI handler for static files */
