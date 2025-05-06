@@ -1,7 +1,9 @@
-# S.A.G.E
-
 <p align="center">
   <img src="./SAGE_logo.png" alt="SAGE Logo" width="300">
+</p>
+
+<p align="center">
+  Soil Analysis & Ground Evaluation System
 </p>
 
 
@@ -79,4 +81,6 @@ ninja: error: rebuilding 'build.ninja': subcommand failed
 
 This error occurs because of the HZ in the built in files, the only way to fix it permanently is to go to the definition file and changing the 1000 to a 100.
 
+# Getting started with the mobile application resource
 
+https://github.com/emmagonz22/S.A.G.E/tree/main/sage-client-app
