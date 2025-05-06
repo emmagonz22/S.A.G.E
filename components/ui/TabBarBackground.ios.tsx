@@ -6,8 +6,8 @@ import { View } from 'tamagui';
 import { useTheme } from '@/context/ThemeProvider';
 export default function BlurTabBarBackground() {
   const {isDarkMode} = useTheme();
-
   const { bottom } = useSafeAreaInsets();
+
   return (
 
     <View style={[
