@@ -28,9 +28,15 @@ static TaskHandle_t sensor_task_handle = NULL;
 // Timer variables
 unsigned long prevMillis = 0;
 const long interval = 1000; // 1-second interval for reading data
+static int64_t sensor_start_time = 0;
 int64_t millis() {
-    return esp_timer_get_time() / 1000;
+    return (esp_timer_get_time() - sensor_start_time) / 1000;
 }
+
+// Needed a new way to reset time without depending on the ESPs timer
+// int64_t millis() {
+//     return esp_timer_get_time() / 1000;
+// }
 
 // Store Sensor Values
 float dht_humidity, dht_temperature, ds18_temperature;
@@ -155,6 +161,10 @@ void save_csv_to_flash(char *name) {
     fwrite(csv_buffer, 1, buffer_index, f);
     fclose(f);
     ESP_LOGI(TAG1, "CSV file saved to %s", file_path);
+
+    memset(csv_buffer, 0, sizeof(csv_buffer));
+    buffer_index = 0;
+
 }
 
 
@@ -242,19 +252,50 @@ void sensor_task(void *pvParameters) {
 }
 
 void start_sensor() {
+    sensor_start_time = esp_timer_get_time();
     if (sensor_task_handle == NULL) {
         xTaskCreate(sensor_task, "sensor_task", 4096, NULL, 5, &sensor_task_handle);
         ESP_LOGI(TAG1, "Sensor task started.");
     } else {
-        vTaskResume(sensor_task_handle);
-        ESP_LOGI(TAG1, "Sensor task resumed.");
+        ESP_LOGW(TAG1, "Sensor task already created. Use toggle_sensor instead.");
     }
 }
+
+void toggle_sensor() {
+    if (sensor_task_handle != NULL) {
+        eTaskState state = eTaskGetState(sensor_task_handle);
+        if (state == eSuspended) {
+            vTaskResume(sensor_task_handle);
+            ESP_LOGI(TAG1, "Sensor task resumed.");
+        } else {
+            vTaskSuspend(sensor_task_handle);
+            ESP_LOGI(TAG1, "Sensor task suspended.");
+        }
+    } else {
+        ESP_LOGW(TAG1, "Sensor task handle is NULL. Call start_sensor() first.");
+    }
+}
+
+
 void stop_sensor(char *name) {
     if (sensor_task_handle != NULL) {
-        vTaskSuspend(sensor_task_handle);
-        ESP_LOGI(TAG1, "Sensor task suspended. Device Name: %s", name);
+        if (name == NULL || strlen(name) == 0) {
+            ESP_LOGW(TAG1, "Provided name is empty before deleting task.");
+        } else {
+            ESP_LOGI(TAG1, "Stopping sensor task with name: %s", name);
+        }
+
+        // Save file
         save_csv_to_flash(name);
         read_csv_from_flash(name);
+        // Delete task
+        vTaskDelete(sensor_task_handle);
+        sensor_task_handle = NULL;
+
+
+    } else {
+        ESP_LOGW(TAG1, "No sensor task to delete.");
     }
 }
+
+

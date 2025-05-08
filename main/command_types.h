@@ -6,7 +6,7 @@ typedef enum {
     CMD_START_SENSOR,
     CMD_STOP_SENSOR,
     CMD_SET_NAME,
-    // Add other commands as necessary
+    CMD_TOGGLE_SENSOR,
 } CommandType;
 
 typedef struct {

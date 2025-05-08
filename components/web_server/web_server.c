@@ -31,7 +31,9 @@ static QueueHandle_t q;  // Declare q globally for use in multiple functions
 typedef enum {
     CMD_START_SENSOR,
     CMD_STOP_SENSOR,
-    CMD_SET_NAME
+    CMD_SET_NAME,
+    CMD_TOGGLE_SENSOR
+
 } CommandType;
 
 
@@ -204,9 +206,49 @@ static esp_err_t start_sensor_handler(httpd_req_t *req) {
     CommandType cmd = CMD_START_SENSOR;
     xQueueSend(q, &cmd, portMAX_DELAY);
     httpd_resp_send(req, "OK", HTTPD_RESP_USE_STRLEN);
-    ESP_LOGI(TAG, "Running");
+    ESP_LOGI(TAG, "Start sensor command sent.");
     return ESP_OK;
 }
+
+// static esp_err_t resume_sensor_handler(httpd_req_t *req) {
+//     QueueHandle_t q = (QueueHandle_t) req->user_ctx;
+
+//     CommandType cmd = CMD_RESUME_SENSOR;
+//     xQueueSend(q, &cmd, portMAX_DELAY);
+//     httpd_resp_send(req, "OK", HTTPD_RESP_USE_STRLEN);
+//     ESP_LOGI(TAG, "Resume sensor command sent.");
+//     return ESP_OK;
+// }
+
+// static esp_err_t toggle_sensor_handler(httpd_req_t *req) {
+//     QueueHandle_t q = (QueueHandle_t) req->user_ctx;
+
+//     CommandType cmd = CMD_TOGGLE_SENSOR;
+//     if (xQueueSend(q, &cmd, portMAX_DELAY) != pdPASS) {
+//         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to send toggle command");
+//         return ESP_FAIL;
+//     }
+
+//     httpd_resp_send(req, "Toggle sensor command sent", HTTPD_RESP_USE_STRLEN);
+//     ESP_LOGI(TAG, "Toggle sensor command sent.");
+//     return ESP_OK;
+// }
+
+static esp_err_t toggle_sensor_handler(httpd_req_t *req) {
+    QueueHandle_t q = (QueueHandle_t) req->user_ctx;
+
+    CommandType cmd = CMD_TOGGLE_SENSOR;
+    if (xQueueSend(q, &cmd, portMAX_DELAY) != pdPASS) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to send toggle command");
+        return ESP_FAIL;
+    }
+
+    httpd_resp_send(req, "Toggle sensor command sent", HTTPD_RESP_USE_STRLEN);
+    ESP_LOGI(TAG, "Toggle sensor command sent.");
+    return ESP_OK;
+}
+
+
 
 static esp_err_t stop_sensor_handler(httpd_req_t *req) {
     QueueHandle_t q = (QueueHandle_t) req->user_ctx;
@@ -229,18 +271,15 @@ static esp_err_t stop_sensor_handler(httpd_req_t *req) {
 static esp_err_t set_name_handler(httpd_req_t *req) {
     QueueHandle_t q = (QueueHandle_t) req->user_ctx;
 
-    // Allocate buffer for the incoming JSON payload
-    char buf[100];  // adjust size as needed
+    char buf[100];
     int ret = httpd_req_recv(req, buf, MIN(req->content_len, sizeof(buf) - 1));
     if (ret <= 0) {
         return ESP_FAIL;
     }
-    buf[ret] = '\0';  // Null-terminate
+    buf[ret] = '\0';
 
-    // Log or parse the name
     ESP_LOGI("SET_NAME", "Received: %s", buf);
 
-    // Assuming { "name": "Device123" }
     char *name_start = strstr(buf, "\"name\":");
     if (name_start) {
         name_start += 7;
@@ -248,20 +287,28 @@ static esp_err_t set_name_handler(httpd_req_t *req) {
         char *name_end = strchr(name_start, '\"');
         if (name_end) {
             *name_end = '\0';
+
             ESP_LOGI("SET_NAME", "Extracted name: %s", name_start);
+
+            CommandMessage msg = {
+                .type = CMD_SET_NAME
+            };
+            strncpy(msg.payload, name_start, sizeof(msg.payload) - 1);
+            msg.payload[sizeof(msg.payload) - 1] = '\0';
+
+            ESP_LOGI("SET_NAME", "Sending to queue: %s", msg.payload);
+            xQueueSend(q, &msg, portMAX_DELAY);
+
+            httpd_resp_send(req, "OK", HTTPD_RESP_USE_STRLEN);
+            return ESP_OK;
         }
     }
-    CommandMessage msg = {
-        .type = CMD_SET_NAME
-        };
-    strncpy(msg.payload, name_start, sizeof(msg.payload) - 1);
-    msg.payload[sizeof(msg.payload) - 1] = '\0'; // safe null-termination
 
-    xQueueSend(q, &msg, portMAX_DELAY);
-
-    httpd_resp_send(req, "OK", HTTPD_RESP_USE_STRLEN);
-    return ESP_OK;
+    // If we reach here, parsing failed
+    httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON format");
+    return ESP_FAIL;
 }
+
 
 #define MAX_NAME_LEN 128 
 static esp_err_t list_logs_handler(httpd_req_t *req) {
@@ -695,6 +742,14 @@ esp_err_t start_web_server(QueueHandle_t cmd_queue)
         .user_ctx  = (void*) q
 };
 httpd_register_uri_handler(server, &start_uri);
+
+    httpd_uri_t toggle_uri = {
+        .uri       = "/toggle_sensor",
+        .method    = HTTP_GET,
+        .handler   = toggle_sensor_handler,
+        .user_ctx  = (void*) q
+};
+httpd_register_uri_handler(server, &toggle_uri);
 
     httpd_uri_t end_uri = {
         .uri       = "/end_sensor",

@@ -89,15 +89,22 @@ void main_command_handler(void *arg) {
 
     while (1) {
         if (xQueueReceive(command_queue, &msg, portMAX_DELAY)) {
+            ESP_LOGI(TAG, "Command received: %d", msg.type);
             switch (msg.type) {
                 case CMD_START_SENSOR:
                     start_sensor();  // From sensor_processing.c
                     break;
                 case CMD_STOP_SENSOR:
+                    ESP_LOGI(TAG, "CMD_STOP_SENSOR received. name_device: %s", name_device);
                     stop_sensor(name_device);   // From sensor_processing.c
                     break;
                 case CMD_SET_NAME:
-                    set_name_device(msg.payload); // Passign the Name
+                    ESP_LOGI(TAG, "CMD_SET_NAME received. Payload: %s", msg.payload);
+                    set_name_device(msg.payload); // Set global or static name_device
+                    ESP_LOGI(TAG, "Device name set to: %s", name_device);
+                    break;
+                case CMD_TOGGLE_SENSOR:
+                    toggle_sensor();
                     break;
                 default:
                     break;

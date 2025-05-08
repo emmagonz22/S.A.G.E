@@ -54,4 +54,5 @@ void read_csv_from_flash(char *name);
 void sensor_task(void *pvParameters);
 void start_sensor();
 void stop_sensor();
+void toggle_sensor();
 #endif // SENSOR_PROCESSING_H
