@@ -7,6 +7,8 @@
 #include "esp_log.h"
 #include "esp_vfs.h"
 #include "esp_spiffs.h"
+#include <sys/time.h>
+#include <time.h>
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -406,40 +408,226 @@ esp_err_t get_all_logs_handler(httpd_req_t *req) {
     struct dirent *entry;
     struct stat file_stat;
 
-    char json_buffer[1024];  // Adjust as needed
+    char json_buffer[1024];
     size_t offset = 0;
 
-    offset += snprintf(json_buffer + offset, sizeof(json_buffer) - offset, "{ \"logs\": [");
+    offset += snprintf(json_buffer + offset, sizeof(json_buffer) - offset,
+                       "{ \"logs\": [");
 
     bool first = true;
     while ((entry = readdir(dir)) != NULL) {
-        // Build full path to the file
+        // Only process .csv files
+        const char *ext = strrchr(entry->d_name, '.');
+        if (!ext || strcmp(ext, ".csv") != 0) {
+            continue; // skip non-.csv files
+        }
+
+        // Build full path
         char filepath[300];
-        snprintf(filepath, sizeof(filepath), "/spiffs/csv_logs/%s", entry->d_name);
+        snprintf(filepath, sizeof(filepath),
+                 "/csv_logs/%s", entry->d_name);
 
         if (stat(filepath, &file_stat) == 0 && S_ISREG(file_stat.st_mode)) {
             if (!first) {
-                offset += snprintf(json_buffer + offset, sizeof(json_buffer) - offset, ",");
+                offset += snprintf(json_buffer + offset,
+                                   sizeof(json_buffer) - offset,
+                                   ",");
             }
             first = false;
 
-            // Convert last modified time to a string
-            struct tm *tm_info = localtime(&file_stat.st_mtime);
+            // Format time
+            struct tm tm_info;
+            gmtime_r(&file_stat.st_mtime, &tm_info);
             char time_str[64];
-            strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tm_info);
+            strftime(time_str, sizeof(time_str),
+                     "%Y-%m-%d %H:%M:%S", &tm_info);
 
-            // Add to JSON object
-            offset += snprintf(json_buffer + offset, sizeof(json_buffer) - offset,
-                "{\"name\":\"%s\",\"date\":\"%s\"}",
-                entry->d_name, time_str);
+            // Add to JSON
+            offset += snprintf(json_buffer + offset,
+                               sizeof(json_buffer) - offset,
+                "{\"id\":%ld,\"name\":\"%s\",\"date\":\"%s\"}",
+                (long)file_stat.st_mtime,
+                entry->d_name,
+                time_str);
         }
     }
 
     closedir(dir);
 
-    offset += snprintf(json_buffer + offset, sizeof(json_buffer) - offset, "] }");
+    offset += snprintf(json_buffer + offset, sizeof(json_buffer) - offset,
+                       "] }");
 
     httpd_resp_send(req, json_buffer, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+esp_err_t set_time_handler(httpd_req_t *req) {
+    char query[100];
+    size_t query_len = httpd_req_get_url_query_len(req) + 1;
+
+    if (query_len > 1 && httpd_req_get_url_query_str(req, query, query_len) == ESP_OK) {
+        char ts_str[32];
+        if (httpd_query_key_value(query, "ts", ts_str, sizeof(ts_str)) == ESP_OK) {
+            time_t new_time = (time_t)atoll(ts_str);  // parse UNIX timestamp
+            struct timeval tv = { .tv_sec = new_time };
+            settimeofday(&tv, NULL);
+            ESP_LOGI("TIME", "Time set to: %lld", (long long)new_time);
+            httpd_resp_sendstr(req, "Time updated");
+            return ESP_OK;
+        }
+    }
+
+    httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid timestamp");
+    return ESP_FAIL;
+}
+
+// Treat CSV as a JSON for the App
+static esp_err_t get_csv_as_json_handler(httpd_req_t *req)
+{
+    char query[100];
+    char file_id[64] = "Test_s_log.csv";  // default fallback
+
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        httpd_query_key_value(query, "id", file_id, sizeof(file_id));
+    }
+
+    char filepath[FILE_PATH_MAX];
+    snprintf(filepath, sizeof(filepath), "/csv_logs/%s", file_id);
+
+    // Check if the file exists in the directory first
+    struct dirent *entry;
+    DIR *dir = opendir("/csv_logs");
+    if (!dir) {
+        ESP_LOGE(TAG, "Failed to open directory: /csv_logs");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to access log directory");
+        return ESP_FAIL;
+    }
+
+    bool file_found = false;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, file_id) == 0) {
+            file_found = true;
+            break;
+        }
+    }
+    closedir(dir);
+
+    if (!file_found) {
+        ESP_LOGE(TAG, "CSV file not found: %s", filepath);
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "CSV file not found");
+        return ESP_FAIL;
+    }
+
+    // Now open the file
+    FILE *fp = fopen(filepath, "r");
+    if (!fp) {
+        ESP_LOGE(TAG, "Failed to open CSV file: %s", filepath);
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "CSV file not found");
+        return ESP_FAIL;
+    }
+
+    char line[512];
+    char *headers[32] = {0};
+    int num_headers = 0;
+    bool header_parsed = false;
+    size_t response_len = 0;
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send_chunk(req, "[", 1);  // start of JSON array
+
+    while (fgets(line, sizeof(line), fp)) {
+        line[strcspn(line, "\r\n")] = 0;
+        if (strlen(line) < 3) continue;
+
+        if (!header_parsed) {
+            // Parse header
+            char *token = strtok(line, ",");
+            while (token != NULL && num_headers < 32) {
+                headers[num_headers++] = strdup(token);  // duplicate header strings
+                token = strtok(NULL, ",");
+            }
+            header_parsed = true;
+            continue;
+        }
+
+        // Parse a data row
+        char *values[32] = {0};
+        int val_count = 0;
+        char *token = strtok(line, ",");
+        while (token != NULL && val_count < num_headers) {
+            values[val_count++] = token;
+            token = strtok(NULL, ",");
+        }
+
+        // Build JSON object
+        char json_line[1024] = "{";
+        for (int i = 0; i < val_count; i++) {
+            strcat(json_line, "\"");
+            strcat(json_line, headers[i]);
+            strcat(json_line, "\":\"");
+            strcat(json_line, values[i]);
+            strcat(json_line, "\"");
+            if (i < val_count - 1) strcat(json_line, ",");
+        }
+        strcat(json_line, "}");
+
+        if (response_len > 0) httpd_resp_send_chunk(req, ",", 1);  // comma between objects
+        httpd_resp_send_chunk(req, json_line, strlen(json_line));
+        response_len++;
+    }
+
+    httpd_resp_send_chunk(req, "]", 1);  // end of JSON array
+    httpd_resp_send_chunk(req, NULL, 0);  // signal end of response
+    fclose(fp);
+
+    // Free duplicated headers
+    for (int i = 0; i < num_headers; i++) {
+        free(headers[i]);
+    }
+
+    return ESP_OK;
+}
+
+static esp_err_t check_csv_exists_handler(httpd_req_t *req)
+{
+    char query[100];
+    char id[64] = "";  // Will hold the ID from the query
+
+    // Try to get the query string
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) != ESP_OK) {
+        ESP_LOGW(TAG, "No query string provided");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing query string");
+        return ESP_FAIL;
+    }
+
+    // Try to extract 'id' key from query
+    if (httpd_query_key_value(query, "id", id, sizeof(id)) != ESP_OK) {
+        ESP_LOGW(TAG, "Missing 'id' in query string");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing 'id' parameter");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Received ID: %s", id);
+
+    // Construct the full path to the CSV file
+    char filepath[128];
+    snprintf(filepath, sizeof(filepath), "/csv_logs/%s", id);
+
+    // Try to open the file
+    FILE *fp = fopen(filepath, "r");
+    if (!fp) {
+        ESP_LOGE(TAG, "CSV file not found: %s", filepath);
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "CSV file not found");
+        return ESP_FAIL;
+    }
+
+    fclose(fp);  // File found and successfully opened
+    ESP_LOGI(TAG, "CSV file exists: %s", filepath);
+
+    // Return a simple JSON response
+    const char *response = "{\"status\": \"found\"}";
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
 
@@ -470,7 +658,7 @@ esp_err_t start_web_server(QueueHandle_t cmd_queue)
     /* Start the httpd server */
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG(); // Port and other configuration can be modified here
-    config.max_uri_handlers = 8;
+    config.max_uri_handlers = 12;
     config.uri_match_fn = httpd_uri_match_wildcard;
 
     ESP_LOGI(TAG, "Starting HTTP server on port: %d", config.server_port);
@@ -522,6 +710,14 @@ httpd_uri_t list_logs_uri = {
 };
 httpd_register_uri_handler(server, &list_logs_uri);
 
+httpd_uri_t csv_json_uri = {
+    .uri       = "/get_csv_json",
+    .method    = HTTP_GET,
+    .handler   = check_csv_exists_handler,
+    .user_ctx  = server_data
+};
+httpd_register_uri_handler(server, &csv_json_uri);
+
 httpd_uri_t log_summary_uri = {
     .uri       = "/api/log_summary",
     .method    = HTTP_GET,
@@ -530,10 +726,11 @@ httpd_uri_t log_summary_uri = {
 };
 httpd_register_uri_handler(server, &log_summary_uri);
 
+
 httpd_uri_t get_all_logs_uri = {
     .uri       = "/getAllLogs",
     .method    = HTTP_GET,
-    .handler   = list_logs_handler,
+    .handler   = get_all_logs_handler,
     .user_ctx  = NULL
 };
 
@@ -549,8 +746,20 @@ httpd_register_uri_handler(server, &get_all_logs_uri);
     };
     httpd_register_uri_handler(server, &file_download);
 
+// httpd_uri_t time_uri = {
+//     .uri       = "/set_time",
+//     .method    = HTTP_GET,
+//     .handler   = set_time_handler,
+//     .user_ctx  = NULL
+// };
+// httpd_register_uri_handler(server, &time_uri);
+
+
     return ESP_OK;
 
 
+
 }   
+
+
 
