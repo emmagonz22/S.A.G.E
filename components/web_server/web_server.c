@@ -518,7 +518,6 @@ static esp_err_t get_csv_as_json_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    // Now open the file
     FILE *fp = fopen(filepath, "r");
     if (!fp) {
         ESP_LOGE(TAG, "Failed to open CSV file: %s", filepath);
@@ -530,14 +529,14 @@ static esp_err_t get_csv_as_json_handler(httpd_req_t *req)
     char *headers[32] = {0};
     int num_headers = 0;
     bool header_parsed = false;
-    size_t response_len = 0;
+    bool first_object = true;
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_send_chunk(req, "[", 1);  // start of JSON array
+    httpd_resp_send_chunk(req, "[", 1);  // Start of JSON array
 
     while (fgets(line, sizeof(line), fp)) {
         line[strcspn(line, "\r\n")] = 0;
-        if (strlen(line) < 3) continue;
+        if (strlen(line) < 1) continue;
 
         if (!header_parsed) {
             // Parse header
@@ -559,8 +558,18 @@ static esp_err_t get_csv_as_json_handler(httpd_req_t *req)
             token = strtok(NULL, ",");
         }
 
-        // Build JSON object
-        char json_line[1024] = "{";
+        // Estimate size needed for the JSON object (safely oversize)
+        size_t json_size = num_headers * 64 + 32;
+        char *json_line = malloc(json_size);
+        if (!json_line) {
+            fclose(fp);
+            for (int i = 0; i < num_headers; i++) free(headers[i]);
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
+            return ESP_FAIL;
+        }
+
+        json_line[0] = '\0';
+        strcat(json_line, "{");
         for (int i = 0; i < val_count; i++) {
             strcat(json_line, "\"");
             strcat(json_line, headers[i]);
@@ -571,16 +580,16 @@ static esp_err_t get_csv_as_json_handler(httpd_req_t *req)
         }
         strcat(json_line, "}");
 
-        if (response_len > 0) httpd_resp_send_chunk(req, ",", 1);  // comma between objects
+        if (!first_object) httpd_resp_send_chunk(req, ",", 1);
+        first_object = false;
         httpd_resp_send_chunk(req, json_line, strlen(json_line));
-        response_len++;
+        free(json_line);
     }
 
-    httpd_resp_send_chunk(req, "]", 1);  // end of JSON array
-    httpd_resp_send_chunk(req, NULL, 0);  // signal end of response
+    httpd_resp_send_chunk(req, "]", 1);  // End of JSON array
+    httpd_resp_send_chunk(req, NULL, 0);  // Signal end of response
     fclose(fp);
 
-    // Free duplicated headers
     for (int i = 0; i < num_headers; i++) {
         free(headers[i]);
     }
@@ -588,10 +597,11 @@ static esp_err_t get_csv_as_json_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+
 static esp_err_t check_csv_exists_handler(httpd_req_t *req)
 {
     char query[100];
-    char id[64] = "";  // Will hold the ID from the query
+    char id[64] = ""; 
 
     // Try to get the query string
     if (httpd_req_get_url_query_str(req, query, sizeof(query)) != ESP_OK) {
@@ -713,7 +723,7 @@ httpd_register_uri_handler(server, &list_logs_uri);
 httpd_uri_t csv_json_uri = {
     .uri       = "/get_csv_json",
     .method    = HTTP_GET,
-    .handler   = check_csv_exists_handler,
+    .handler   = get_csv_as_json_handler,
     .user_ctx  = server_data
 };
 httpd_register_uri_handler(server, &csv_json_uri);
