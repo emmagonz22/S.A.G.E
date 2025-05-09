@@ -47,6 +47,7 @@ void sensor_init() {
 
     // // Print CSV header (this will be printed once at startup)
     // Serial.println("Timestamp (ms), Soil Moisture (%), Air Humidity (%), Soil Temp (°C), Air Temp (°C)");
+    onewire_reset(ONE_WIRE_BUS);
     adc1_config_width(ADC_WIDTH_BIT_12);  // 12-bit resolution (0 - 4095)
     adc1_config_channel_atten(ANALOG_SENSOR_PIN_MOISTURE, ADC_ATTEN_DB_11); // Full voltage range (0-3.3V)
     // init_spiffs();
@@ -70,9 +71,15 @@ SensorData read_sensors() {
         // We need to use the DS18B20 instead of ds18x20
         // since the sensor addr. doens't seem to match
         // the manufacturer correctly.
-
+        ds18x20_measure(ONE_WIRE_BUS, DS18X20_ANY,  true);
         result = ds18b20_read_temperature(ONE_WIRE_BUS, DS18X20_ANY, &ds18_temperature);
-        data.temperatureDS18B20 = ds18_temperature;
+        if (result == ESP_OK) {
+            data.temperatureDS18B20 = ds18_temperature;
+        } else {
+            ESP_LOGW("SENSOR_MODULE", "Failed to read from DS18B20, error: %s", esp_err_to_name(result));
+            data.temperatureDS18B20 = -127.0;  // Or some invalid value to signify failure
+        }
+
     // Read Soil Moisture Sensor (analog)
 
         // This one is independent of Arduino Libraries
@@ -138,33 +145,49 @@ void append_csv_row(uint32_t timestamp, float moisture, float humidity, float so
 }
 
 void save_csv_to_flash(char *name) {
+    char base_path[128];
+    char file_path[256];
+    int suffix = 0;
+    FILE *f = NULL;
 
-    char file_path[128]; // "/csv_logs/" + name + "_session_log.csv"
-
-    // Format the file path string
-    
-    if (name == NULL) {
-        snprintf(file_path, sizeof(file_path), "/csv_logs/s_log.csv");
+    // Step 1: Define the base file path pattern
+    if (name == NULL || strlen(name) == 0) {
+        snprintf(base_path, sizeof(base_path), "/csv_logs/s_log");
+    } else {
+        snprintf(base_path, sizeof(base_path), "/csv_logs/%s_s_log", name);
     }
 
-    else {
-        snprintf(file_path, sizeof(file_path), "/csv_logs/%s_s_log.csv", name);
-    }
+    // Step 2: Generate a unique file path
+    do {
+        if (suffix == 0) {
+            snprintf(file_path, sizeof(file_path), "%s.csv", base_path);
+        } else {
+            snprintf(file_path, sizeof(file_path), "%s_%d.csv", base_path, suffix);
+        }
 
+        f = fopen(file_path, "r");
+        if (f != NULL) {
+            fclose(f);
+            suffix++;
+        }
+    } while (f != NULL && suffix < 100);  // safety limit
 
-    FILE *f = fopen(file_path, "w");
+    // Step 3: Open the unique file for writing
+    f = fopen(file_path, "w");
     if (f == NULL) {
-        ESP_LOGE(TAG1, "Failed to open file for writing");
+        ESP_LOGE(TAG1, "Failed to open file for writing: %s", file_path);
         return;
     }
-    fprintf(f, "Timestamp,Moisture,Humidity,SoilTemp,AirTemp\n"); // Header
+
+    // Step 4: Write header and buffer data
+    fprintf(f, "Timestamp,Moisture,Humidity,SoilTemp,AirTemp\n");
     fwrite(csv_buffer, 1, buffer_index, f);
     fclose(f);
     ESP_LOGI(TAG1, "CSV file saved to %s", file_path);
 
+    // Step 5: Clear the buffer
     memset(csv_buffer, 0, sizeof(csv_buffer));
     buffer_index = 0;
-
 }
 
 
@@ -206,40 +229,63 @@ void save_csv_to_flash(char *name) {
 
 // CSV Portion 
 void read_csv_from_flash(char *name) {
-    // if (!esp_spiffs_mounted("/csv_logs")) {
-    //     ESP_LOGE(TAG1, "SPIFFS is not mounted, cannot read CSV");
-    //     return;
-    // }
+    char base_path[128];
+    char versioned_path[256];
+    int suffix = 0;
+    FILE *f = NULL;
 
-    char file_path[128]; // "/csv_logs/" + name + "_session_log.csv"
-
-    // Format the file path string
-    
-    if (name == NULL) {
-        snprintf(file_path, sizeof(file_path), "/csv_logs/s_log.csv");
+    // Generate base path
+    if (name == NULL || strlen(name) == 0) {
+        snprintf(base_path, sizeof(base_path), "/csv_logs/s_log");
+    } else {
+        snprintf(base_path, sizeof(base_path), "/csv_logs/%s_s_log", name);
     }
 
-    else {
-        snprintf(file_path, sizeof(file_path), "/csv_logs/%s_s_log.csv", name);
+    // Read unversioned file first
+    snprintf(versioned_path, sizeof(versioned_path), "%s.csv", base_path);
+    f = fopen(versioned_path, "r");
+
+    if (f != NULL) {
+        ESP_LOGI(TAG1, "Reading: %s", versioned_path);
+        char line[128];
+        while (fgets(line, sizeof(line), f)) {
+            ESP_LOGI(TAG1, "CSV: %s", line);
+        }
+        fclose(f);
+    } else {
+        ESP_LOGW(TAG1, "File not found: %s", versioned_path);
     }
 
-    FILE *f = fopen(file_path, "r");
-    if (f == NULL) {
-        ESP_LOGE(TAG1, "Failed to open CSV file for reading");
-        return;
+    // Now check for versioned files like _1.csv, _2.csv, etc.
+    suffix = 1;
+    while (suffix < 100) {
+        snprintf(versioned_path, sizeof(versioned_path), "%s_%d.csv", base_path, suffix);
+        f = fopen(versioned_path, "r");
+
+        if (f == NULL) {
+            break;  // No more files found
+        }
+
+        ESP_LOGI(TAG1, "Reading: %s", versioned_path);
+        char line[128];
+        while (fgets(line, sizeof(line), f)) {
+            ESP_LOGI(TAG1, "CSV: %s", line);
+        }
+        fclose(f);
+        suffix++;
     }
 
-    char line[128]; // Adjust buffer size as needed
-    while (fgets(line, sizeof(line), f)) {
-        ESP_LOGI(TAG1, "CSV: %s", line);  // Output to serial console
+    if (suffix == 1 && f == NULL) {
+        ESP_LOGE(TAG1, "No CSV files found for base name: %s", base_path);
     }
-
-    fclose(f);
 }
+
 
 // Define maint ask functions: To be used by main.c
 
 void sensor_task(void *pvParameters) {
+    sensor_init();
+    onewire_reset(ONE_WIRE_BUS);
     while (1) {
         SensorData data = read_sensors();
         ESP_LOGI(TAG1, "read_sensors was executed.");
