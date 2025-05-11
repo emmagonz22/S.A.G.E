@@ -30,6 +30,7 @@
         "xmemory": "c",
         "xstring": "c",
         "xtree": "c",
-        "xutility": "c"
+        "xutility": "c",
+        "math.h": "c"
     }
 }

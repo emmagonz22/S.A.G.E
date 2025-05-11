@@ -17,6 +17,10 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "driver/uart.h"
+#include "driver/gpio.h"
+#include <math.h>
+
 // Tasks
 static TaskHandle_t sensor_task_handle = NULL;
 
@@ -39,7 +43,7 @@ int64_t millis() {
 // }
 
 // Store Sensor Values
-float dht_humidity, dht_temperature, ds18_temperature;
+float dht_humidity, dht_temperature, ds18_temperature, rs485_ph, rs485_n, rs485_p, rs485_k, rs485_ec, rs485_moisture;
 
 void sensor_init() {
     // ds18b20.begin();
@@ -52,6 +56,128 @@ void sensor_init() {
     adc1_config_channel_atten(ANALOG_SENSOR_PIN_MOISTURE, ADC_ATTEN_DB_11); // Full voltage range (0-3.3V)
     // init_spiffs();
 }
+
+// NPK Sensor Functions
+// Need to create my own library to access the values
+void send_command(const uint8_t* command, size_t length) {
+    gpio_set_level(RE_PIN, 1);
+    vTaskDelay(pdMS_TO_TICKS(10));
+    uart_write_bytes(UART_PORT, (const char*)command, length);
+    uart_wait_tx_done(UART_PORT, pdMS_TO_TICKS(100));
+    gpio_set_level(RE_PIN, 0);
+}
+// Reads a sensor and outputs the result through a float pointer
+esp_err_t read_value_485(const char *label, const uint8_t *command, bool divideBy10, const char *unit, float *out_value) {
+    if (out_value == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    uint8_t response[8] = {0};
+    send_command(command, 8);
+
+    // Wait for response
+    int len = uart_read_bytes(UART_PORT, response, sizeof(response), pdMS_TO_TICKS(200));
+    if (len >= 5) {
+        int raw = (response[3] << 8) | response[4];
+        float value = divideBy10 ? raw / 10.0f : raw;
+        *out_value = value;
+
+        printf("%s: %.1f %s\n", label, value, unit);
+        return ESP_OK;
+    } else {
+        ESP_LOGW(TAG1, "%s: Read error (got %d bytes)", label, len);
+        return ESP_FAIL;
+    }
+}
+
+// Estimations of Soil Nutrients
+// Based on agronomic patterns and real-world studies:
+// USDA NRCS Soil Nutrient Guidelines, FAO Soil Fertility Handbook (FAO, 2006),
+// "Soil Fertility and Fertilizers" by Havlin et al. 
+// Yadav et al. (2012) – Correlation between EC and macronutrients in Indian soils.
+// https://www.mdpi.com/1424-8220/20/23/6934
+float estimate_nitrogen(float ec, float pH, float moisture) {
+    float base_n;
+
+    // Logarithmic response
+    if (ec < 100)
+        base_n = ec * 0.5f;  // very low EC = likely poor nitrogen
+    else
+        base_n = 100.0f * logf(ec / 100.0f + 1.0f);  // mg/L scale
+
+    // Adjust for pH availability
+    if (pH < 5.5 || pH > 8.0)
+        base_n *= 0.6f;
+    else if (pH < 6.0 || pH > 7.5)
+        base_n *= 0.8f;
+
+    // Moisture correction
+    if (moisture < 20)
+        base_n *= 0.7f;
+    else if (moisture > 60)
+        base_n *= 0.9f;
+
+    // Cap if desired (typical soil N rarely exceeds 150 mg/L)
+    if (base_n > 150.0f)
+        base_n = 150.0f;
+
+    return base_n; // mg/L
+}
+
+float estimate_phosphorus(float ec, float pH, float moisture) {
+    float base_p = 10.0f; // Starting baseline
+
+    // pH sensitivity (P locks in acidic/alkaline soils)
+    if (pH < 5.5 || pH > 7.5)
+        base_p *= 0.5f;
+    else if (pH < 6.0 || pH > 7.0)
+        base_p *= 0.75f;
+
+    // Mild log-based EC contribution
+    if (ec > 100)
+        base_p += 10.0f * logf(ec / 100.0f + 1.0f);
+    else
+        base_p += ec * 0.1f;
+
+    // Moisture mobility
+    if (moisture < 25)
+        base_p *= 0.75f;
+
+    // Cap to reasonable field max (e.g., 50–60 mg/L)
+    if (base_p > 60.0f)
+        base_p = 60.0f;
+
+    return base_p; // mg/L
+}
+
+
+float estimate_potassium(float ec, float pH, float moisture) {
+    float base_k;
+
+    // Use logarithmic growth for realistic ramp-up
+    if (ec < 100)
+        base_k = ec * 0.3f;  // very low EC, likely infertile
+    else
+        base_k = 150.0f * logf(ec / 100.0f + 1.0f);  // smooth curve
+
+    // Apply pH correction
+    if (pH < 5.5 || pH > 8.0)
+        base_k *= 0.7f;
+    else if (pH > 7.5)
+        base_k *= 0.85f;
+
+    // Moisture impact on ion mobility
+    if (moisture < 20)
+        base_k *= 0.6f;
+
+    if (base_k > 2000.0f)
+        base_k = 2000.0f;
+
+    return base_k; // mg/L
+}
+
+
+//NPK Sensor Set Up
 
 SensorData read_sensors() {
     SensorData data;
@@ -96,6 +222,27 @@ SensorData read_sensors() {
 
         data.currentMillis = currMillis;
 
+        read_value_485("Humidity",     humi,  true,  "%", &rs485_moisture);
+        // read_sensor("Temperature",  temp,  true,  "deg.C");
+        read_value_485("Conductivity", cond,  false, "uS/cm", &rs485_ec);
+        read_value_485("pH",           phph,  true,  "", &rs485_ph);
+        read_value_485("Nitrogen",     nitro, false, "mg/L", &rs485_n);
+        read_value_485("Phosphorus",   phos,  false, "mg/L", &rs485_p);
+        read_value_485("Potassium",    pota,  false, "mg/L", &rs485_k);
+        // read_value_485("Salinity",     sali,  false, "g/L");
+        //read_value_485("TDS",          tds,   false, "mg/L", &rs485_n);
+
+        data.nitro = estimate_nitrogen(rs485_ec, rs485_ph, rs485_moisture);
+        data.phos = estimate_phosphorus(rs485_ec, rs485_ph, rs485_moisture);
+        data.pota =estimate_potassium(rs485_ec, rs485_ph, rs485_moisture);
+
+        //data.nitro = rs485_n;
+        //data.phos = rs485_p;
+        //data.pota = rs485_k;
+        data.ph = rs485_ph;
+
+
+
         // Print data in CSV format
         // Serial.print(currMillis); Serial.print(", ");
         // Serial.print(data.moisturePercent); Serial.print(", ");
@@ -103,9 +250,9 @@ SensorData read_sensors() {
         // Serial.print(data.temperatureDS18B20); Serial.print(", ");
         // Serial.println(data.temperatureDHT);
     }
-    ESP_LOGI("SENSOR_MODULE", "Timestamp: %lu ms | Moisture: %.2f%% | Humidity: %.2f%% | Soil Temp: %.2f°C | Air Temp: %.2f°C", 
-                 data.currentMillis, data.moisturePercent, data.humidity, data.temperatureDS18B20, data.temperatureDHT);
-    append_csv_row(data.currentMillis, data.moisturePercent, data.humidity, data.temperatureDS18B20, data.temperatureDHT);
+    ESP_LOGI("SENSOR_MODULE", "Timestamp: %lu ms | Moisture: %.2f%% | Humidity: %.2f%% | Soil Temp: %.2f°C | Air Temp: %.2f°C | Soil pH: %.2f | Nitrogen: %.2f | Phosphorus: %.2f | Potassium: %.2f", 
+                 data.currentMillis, data.moisturePercent, data.humidity, data.temperatureDS18B20, data.temperatureDHT, data.ph, data.nitro, data.phos, data.pota);
+    append_csv_row(data.currentMillis, data.moisturePercent, data.humidity, data.temperatureDS18B20, data.temperatureDHT, data.ph, data.nitro, data.phos, data.pota);
     //read_csv_from_flash();
     return data;
 }
@@ -124,15 +271,18 @@ float constrain_value(float value, float min_val, float max_val) {
 }
 
 
+
+
 // Storage: Saving the Sensor data into a CSV
-static const char *TAG1 = "SENSOR_MODULE";
+
 bool stopLogging = false;
 char csv_buffer[4096];  // ~4KB buffer for storing session
 size_t buffer_index = 0;
 
 // CSV Portion - Probaly should be moved to the sensor processing
-void append_csv_row(uint32_t timestamp, float moisture, float humidity, float soil_temp, float air_temp) {
-    // Append to buffer
+void append_csv_row(uint32_t timestamp, float moisture, float humidity,
+                     float soil_temp, float air_temp,
+                    float ph, float nitro, float phos, float pota){  
     buffer_index += snprintf(&csv_buffer[buffer_index],
         sizeof(csv_buffer) - buffer_index,
         "%lu,%.2f,%.2f,%.2f,%.2f\n",
@@ -298,6 +448,30 @@ void sensor_task(void *pvParameters) {
 }
 
 void start_sensor() {
+
+    // GPIO setup
+    gpio_config_t io_conf = {
+        .pin_bit_mask = (1ULL << RE_PIN),
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE
+    };
+    gpio_config(&io_conf);
+    gpio_set_level(RE_PIN, 0);
+
+    // UART config
+    uart_config_t uart_config = {
+        .baud_rate = 4800,
+        .data_bits = UART_DATA_8_BITS,
+        .parity    = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE
+    };
+    uart_param_config(UART_PORT, &uart_config);
+    uart_set_pin(UART_PORT, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    uart_driver_install(UART_PORT, 256, 0, 0, NULL, 0);
+
     sensor_start_time = esp_timer_get_time();
     if (sensor_task_handle == NULL) {
         xTaskCreate(sensor_task, "sensor_task", 4096, NULL, 5, &sensor_task_handle);
