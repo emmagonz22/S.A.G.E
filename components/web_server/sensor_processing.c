@@ -46,15 +46,33 @@ int64_t millis() {
 float dht_humidity, dht_temperature, ds18_temperature, rs485_ph, rs485_n, rs485_p, rs485_k, rs485_ec, rs485_moisture;
 
 void sensor_init() {
-    // ds18b20.begin();
-    // pinMode(MOISTURE_PIN, INPUT);
 
-    // // Print CSV header (this will be printed once at startup)
-    // Serial.println("Timestamp (ms), Soil Moisture (%), Air Humidity (%), Soil Temp (°C), Air Temp (°C)");
     onewire_reset(ONE_WIRE_BUS);
     adc1_config_width(ADC_WIDTH_BIT_12);  // 12-bit resolution (0 - 4095)
     adc1_config_channel_atten(ANALOG_SENSOR_PIN_MOISTURE, ADC_ATTEN_DB_11); // Full voltage range (0-3.3V)
-    // init_spiffs();
+    
+    // GPIO setup
+    gpio_config_t io_conf = {
+        .pin_bit_mask = (1ULL << RE_PIN),
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE
+    };
+    gpio_config(&io_conf);
+    gpio_set_level(RE_PIN, 0);
+
+    // UART config
+    uart_config_t uart_config = {
+        .baud_rate = 4800,
+        .data_bits = UART_DATA_8_BITS,
+        .parity    = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE
+    };
+    uart_param_config(UART_PORT, &uart_config);
+    uart_set_pin(UART_PORT, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    uart_driver_install(UART_PORT, 256, 0, 0, NULL, 0);
 }
 
 // NPK Sensor Functions
@@ -285,8 +303,8 @@ void append_csv_row(uint32_t timestamp, float moisture, float humidity,
                     float ph, float nitro, float phos, float pota){  
     buffer_index += snprintf(&csv_buffer[buffer_index],
         sizeof(csv_buffer) - buffer_index,
-        "%lu,%.2f,%.2f,%.2f,%.2f\n",
-        timestamp, moisture, humidity, soil_temp, air_temp);
+        "%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
+        timestamp, moisture, humidity, soil_temp, air_temp, ph, nitro, phos, pota);
 
     // Avoid buffer overflow
     if (buffer_index >= sizeof(csv_buffer) - 100) {
@@ -330,7 +348,7 @@ void save_csv_to_flash(char *name) {
     }
 
     // Step 4: Write header and buffer data
-    fprintf(f, "Timestamp,Moisture,Humidity,SoilTemp,AirTemp\n");
+    fprintf(f, "Timestamp,Moisture,Humidity,SoilTemp,AirTemp,pH,Nitrogen,Phosphorus,Potassium\n");
     fwrite(csv_buffer, 1, buffer_index, f);
     fclose(f);
     ESP_LOGI(TAG1, "CSV file saved to %s", file_path);
@@ -449,28 +467,7 @@ void sensor_task(void *pvParameters) {
 
 void start_sensor() {
 
-    // GPIO setup
-    gpio_config_t io_conf = {
-        .pin_bit_mask = (1ULL << RE_PIN),
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE
-    };
-    gpio_config(&io_conf);
-    gpio_set_level(RE_PIN, 0);
 
-    // UART config
-    uart_config_t uart_config = {
-        .baud_rate = 4800,
-        .data_bits = UART_DATA_8_BITS,
-        .parity    = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE
-    };
-    uart_param_config(UART_PORT, &uart_config);
-    uart_set_pin(UART_PORT, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-    uart_driver_install(UART_PORT, 256, 0, 0, NULL, 0);
 
     sensor_start_time = esp_timer_get_time();
     if (sensor_task_handle == NULL) {

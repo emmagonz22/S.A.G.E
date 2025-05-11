@@ -101,8 +101,6 @@
                         const text = await res.text();
                         console.log("Log content:", text);
             
-                        // Populate the content dynamically here
-                        // e.g., show in <pre> or parse CSV
                         const container = document.createElement("pre");
                         container.textContent = text;
                         document.querySelector(".log-content").appendChild(container);

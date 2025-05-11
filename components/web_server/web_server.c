@@ -349,11 +349,11 @@ static esp_err_t list_logs_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// Summarize log entries into an average of all scans
+// Summarize log entries into an average of all scans, except for NPK
 static esp_err_t get_log_summary_handler(httpd_req_t *req)
 {
-    char query[100];
-    char file_id[64] = "Test_s_log.csv";  // default fallback
+    char query[100] = {0};
+    char file_id[64] = "Test_s_log.csv";  // default
 
     if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
         httpd_query_key_value(query, "id", file_id, sizeof(file_id));
@@ -369,51 +369,56 @@ static esp_err_t get_log_summary_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    char line[512];
-    int col_index[5] = {-1, -1, -1, -1, -1}; // Indexes for Moisture, Humidity, SoilTemp, AirTemp, Unknown
-    const char *col_names[5] = {"Moisture", "Humidity", "SoilTemp", "AirTemp", "Unknown"};
-    float sum[5] = {0};
-    int count[5] = {0};
+    char *line = malloc(512);
+    if (!line) {
+        fclose(fp);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
+        return ESP_FAIL;
+    }
+
+    const char *col_names[8] = {"Moisture", "Humidity", "SoilTemp", "AirTemp", "pH", "Nitrogen", "Phosphorus", "Potassium"};
+    int col_index[8];
+    float sum[8] = {0};
+    int count[8] = {0};
+    memset(col_index, -1, sizeof(col_index));
+
     bool header_parsed = false;
 
-    while (fgets(line, sizeof(line), fp)) {
+    while (fgets(line, 512, fp)) {
         line[strcspn(line, "\r\n")] = 0;
         if (strlen(line) < 3) continue;
 
         if (!header_parsed) {
-            // Parse header and store column indexes
             int i = 0;
             char *token = strtok(line, ",");
-            while (token != NULL) {
-                for (int j = 0; j < 5; j++) {
-                    if (col_index[j] == -1 && strcmp(token, col_names[j]) == 0) {
+            while (token && i < 32) {
+                for (int j = 0; j < 8; j++) {
+                    if (col_names[j] && strcmp(token, col_names[j]) == 0) {
                         col_index[j] = i;
                     }
                 }
-                i++;
                 token = strtok(NULL, ",");
+                i++;
             }
             header_parsed = true;
             continue;
         }
 
-        // Parse data row
-        char *token_array[20] = {0};  // up to 20 columns
+        // Tokenize data line
+        char *token_array[32] = {0};
         int col = 0;
         char *token = strtok(line, ",");
-        while (token != NULL && col < 20) {
+        while (token && col < 32) {
             token_array[col++] = token;
             token = strtok(NULL, ",");
         }
 
-        // Use index map to extract values
-        for (int j = 0; j < 5; j++) {
+        for (int j = 0; j < 8; j++) {
             int idx = col_index[j];
-            if (idx >= 0 && idx < col) {
-                char *val_str = token_array[idx];
+            if (idx >= 0 && idx < col && token_array[idx]) {
                 char *endptr;
-                float val = strtof(val_str, &endptr);
-                if (endptr != val_str) {
+                float val = strtof(token_array[idx], &endptr);
+                if (endptr != token_array[idx]) {
                     sum[j] += val;
                     count[j]++;
                 }
@@ -421,10 +426,10 @@ static esp_err_t get_log_summary_handler(httpd_req_t *req)
         }
     }
     fclose(fp);
+    free(line);
 
-    // Format output values
-    char avg[5][16];
-    for (int i = 0; i < 5; i++) {
+    char avg[8][16];
+    for (int i = 0; i < 8; i++) {
         if (count[i]) {
             snprintf(avg[i], sizeof(avg[i]), "%.2f", sum[i] / count[i]);
         } else {
@@ -432,15 +437,34 @@ static esp_err_t get_log_summary_handler(httpd_req_t *req)
         }
     }
 
-    char response[256];
+    float fert_score = 0;
+    int fert_count = 0;
+    for (int i = 5; i <= 7; i++) {
+        if (count[i]) {
+            fert_score += sum[i] / count[i];
+            fert_count++;
+        }
+    }
+    char fert_str[16];
+    if (fert_count) {
+        snprintf(fert_str, sizeof(fert_str), "%.2f", fert_score / fert_count);
+    } else {
+        strcpy(fert_str, "#");
+    }
+
+    char response[384];
     snprintf(response, sizeof(response),
-        "{\"Moisture\": \"%s\", \"Humidity\": \"%s\", \"SoilTemp\": \"%s\", \"AirTemp\": \"%s\", \"Unknown\": \"%s\"}",
-        avg[0], avg[1], avg[2], avg[3], avg[4]);
+        "{\"Moisture\": \"%s\", \"Humidity\": \"%s\", \"SoilTemp\": \"%s\", \"AirTemp\": \"%s\", \"pH\": \"%s\", \"Fertility\": \"%s\"}",
+        avg[0], avg[1], avg[2], avg[3], avg[4], fert_str);
 
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
+
     return ESP_OK;
 }
+
+
+
 
 esp_err_t get_all_logs_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
