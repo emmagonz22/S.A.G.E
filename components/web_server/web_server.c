@@ -9,6 +9,7 @@
 #include "esp_spiffs.h"
 #include <sys/time.h>
 #include <time.h>
+#include <dirent.h>
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -539,11 +540,86 @@ esp_err_t set_time_handler(httpd_req_t *req) {
     if (query_len > 1 && httpd_req_get_url_query_str(req, query, query_len) == ESP_OK) {
         char ts_str[32];
         if (httpd_query_key_value(query, "ts", ts_str, sizeof(ts_str)) == ESP_OK) {
-            time_t new_time = (time_t)atoll(ts_str);  // parse UNIX timestamp
-            struct timeval tv = { .tv_sec = new_time };
-            settimeofday(&tv, NULL);
-            ESP_LOGI("TIME", "Time set to: %lld", (long long)new_time);
-            httpd_resp_sendstr(req, "Time updated");
+            time_t end_time = (time_t)atoll(ts_str);  // Assume UNIX timestamp in seconds
+
+            // Step 1: Locate latest CSV in /csv_logs/
+            char filepath[272];
+            char latest_file[272] = {0};
+
+            DIR *dir = opendir("/csv_logs");
+            if (!dir) {
+                ESP_LOGE("TIME", "Failed to open /csv_logs");
+                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to open directory");
+                return ESP_FAIL;
+            }
+
+            struct dirent *entry;
+            while ((entry = readdir(dir)) != NULL) {
+                if (entry->d_type == DT_REG && strstr(entry->d_name, ".csv")) {
+                    snprintf(filepath, sizeof(filepath), "/csv_logs/%s", entry->d_name);
+                    ESP_LOGI("TIME", "Found file: %s", filepath);
+                    // Replace latest_file with current filepath (alphabetically last)
+                    if (strcmp(filepath, latest_file) > 0) {
+                        strcpy(latest_file, filepath);
+                    }
+                }
+            }
+            closedir(dir);
+
+            if (strlen(latest_file) == 0) {
+                ESP_LOGE("TIME", "No CSV files found to annotate");
+                httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "No CSV found");
+                return ESP_FAIL;
+            }
+
+            ESP_LOGI("TIME", "Using latest file: %s", latest_file);
+
+            // Step 2: Reopen latest file and get last line
+            FILE *f = fopen(latest_file, "r");
+            if (!f) {
+                ESP_LOGE("TIME", "Failed to open latest CSV file");
+                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "CSV open error");
+                return ESP_FAIL;
+            }
+
+            char line[256];
+            char last_line[256] = {0};
+            while (fgets(line, sizeof(line), f)) {
+                if (strlen(line) > 5) strcpy(last_line, line);
+            }
+            fclose(f);
+
+            // Step 3: Extract last timestamp
+            char *token = strrchr(last_line, ',');  // last value assumed to be timestamp
+            if (!token) {
+                ESP_LOGE("TIME", "Malformed CSV: no timestamp found");
+                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Bad CSV format");
+                return ESP_FAIL;
+            }
+
+            float last_timestamp = atof(token + 1);  // skip the comma
+            time_t start_time = end_time - (time_t)(last_timestamp / 1000);  // assuming ms timestamp
+
+            // Step 4: Append time info as new row
+            f = fopen(latest_file, "a");
+            if (!f) {
+                ESP_LOGE("TIME", "Failed to reopen CSV for appending");
+                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "CSV append error");
+                return ESP_FAIL;
+            }
+
+            struct tm tm_start, tm_end;
+            localtime_r(&start_time, &tm_start);
+            localtime_r(&end_time, &tm_end);
+            char start_buf[32], end_buf[32];
+            strftime(start_buf, sizeof(start_buf), "%Y-%m-%d %H:%M:%S", &tm_start);
+            strftime(end_buf, sizeof(end_buf), "%Y-%m-%d %H:%M:%S", &tm_end);
+
+            fprintf(f, "\nSTART_TIME,END_TIME\n%s,%s\n", start_buf, end_buf);
+            fclose(f);
+
+            ESP_LOGI("TIME", "Start: %s | End: %s written to %s", start_buf, end_buf, latest_file);
+            httpd_resp_sendstr(req, "Time range written to CSV");
             return ESP_OK;
         }
     }
@@ -584,7 +660,7 @@ static esp_err_t get_csv_as_json_handler(httpd_req_t *req)
     closedir(dir);
 
     if (!file_found) {
-        ESP_LOGE(TAG, "CSV file not found: %s", filepath);
+        ESP_LOGE(TAG, "JSON Handler: CSV file not found: %s", filepath);
         httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "CSV file not found");
         return ESP_FAIL;
     }
@@ -764,67 +840,75 @@ esp_err_t start_web_server(QueueHandle_t cmd_queue)
         .method    = HTTP_GET,
         .handler   = start_sensor_handler,
         .user_ctx  = (void*) q
-};
-httpd_register_uri_handler(server, &start_uri);
+    };
+    httpd_register_uri_handler(server, &start_uri);
 
     httpd_uri_t toggle_uri = {
         .uri       = "/toggle_sensor",
         .method    = HTTP_GET,
         .handler   = toggle_sensor_handler,
         .user_ctx  = (void*) q
-};
-httpd_register_uri_handler(server, &toggle_uri);
+    };
+    httpd_register_uri_handler(server, &toggle_uri);
 
     httpd_uri_t end_uri = {
         .uri       = "/end_sensor",
         .method    = HTTP_GET,
         .handler   = stop_sensor_handler,
         .user_ctx  = (void*) q
-};
-httpd_register_uri_handler(server, &end_uri);
+    };
+    httpd_register_uri_handler(server, &end_uri);
 
     httpd_uri_t name_uri = {
         .uri       = "/set_name",
         .method    = HTTP_POST,
         .handler   = set_name_handler,
         .user_ctx  = (void*) q
-};
-httpd_register_uri_handler(server, &name_uri);
+    };
+    httpd_register_uri_handler(server, &name_uri);
 
-httpd_uri_t list_logs_uri = {
-    .uri       = "/logs/list",
-    .method    = HTTP_GET,
-    .handler   = list_logs_handler,
-    .user_ctx  = NULL
-};
-httpd_register_uri_handler(server, &list_logs_uri);
+    httpd_uri_t list_logs_uri = {
+        .uri       = "/logs/list",
+        .method    = HTTP_GET,
+        .handler   = list_logs_handler,
+        .user_ctx  = NULL
+    };
+    httpd_register_uri_handler(server, &list_logs_uri);
 
-httpd_uri_t csv_json_uri = {
-    .uri       = "/get_csv_json",
-    .method    = HTTP_GET,
-    .handler   = get_csv_as_json_handler,
-    .user_ctx  = server_data
-};
-httpd_register_uri_handler(server, &csv_json_uri);
+    httpd_uri_t csv_json_uri = {
+        .uri       = "/get_csv_json",
+        .method    = HTTP_GET,
+        .handler   = get_csv_as_json_handler,
+        .user_ctx  = server_data
+    };
+    httpd_register_uri_handler(server, &csv_json_uri);
 
-httpd_uri_t log_summary_uri = {
-    .uri       = "/api/log_summary",
-    .method    = HTTP_GET,
-    .handler   = get_log_summary_handler,
-    .user_ctx  = server_data
-};
-httpd_register_uri_handler(server, &log_summary_uri);
+    httpd_uri_t log_summary_uri = {
+        .uri       = "/api/log_summary",
+        .method    = HTTP_GET,
+        .handler   = get_log_summary_handler,
+        .user_ctx  = server_data
+    };
+    httpd_register_uri_handler(server, &log_summary_uri);
 
 
-httpd_uri_t get_all_logs_uri = {
-    .uri       = "/getAllLogs",
-    .method    = HTTP_GET,
-    .handler   = get_all_logs_handler,
-    .user_ctx  = NULL
-};
+    httpd_uri_t get_all_logs_uri = {
+        .uri       = "/getAllLogs",
+        .method    = HTTP_GET,
+        .handler   = get_all_logs_handler,
+        .user_ctx  = NULL
+    };
 
-httpd_register_uri_handler(server, &get_all_logs_uri);
+    httpd_register_uri_handler(server, &get_all_logs_uri);
 
+
+    httpd_uri_t time_uri = {
+        .uri       = "/set_time",
+        .method    = HTTP_GET,
+        .handler   = set_time_handler,
+        .user_ctx  = NULL
+    };
+    httpd_register_uri_handler(server, &time_uri);
 
     /* URI handler for static files */
     httpd_uri_t file_download = {
@@ -835,13 +919,6 @@ httpd_register_uri_handler(server, &get_all_logs_uri);
     };
     httpd_register_uri_handler(server, &file_download);
 
-// httpd_uri_t time_uri = {
-//     .uri       = "/set_time",
-//     .method    = HTTP_GET,
-//     .handler   = set_time_handler,
-//     .user_ctx  = NULL
-// };
-// httpd_register_uri_handler(server, &time_uri);
 
 
     return ESP_OK;

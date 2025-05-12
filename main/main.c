@@ -132,7 +132,8 @@ void app_main(void)
     wifi_init_softap();
 
     /* Start web server */
-    sensor_init();
+    //sensor_init();
+
     command_queue = xQueueCreate(10, sizeof(CommandMessage));
 
     xTaskCreate(main_command_handler, "CommandHandler", 4096, NULL, 5, NULL);
@@ -147,5 +148,6 @@ void app_main(void)
     ESP_LOGI("WIFI", "AP IP Address: " IPSTR, IP2STR(&ip_info.ip));
 
     // Later: pass to app interface
+    write_test_csv_to_flash();
 }
 
