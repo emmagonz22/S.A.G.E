@@ -88,5 +88,32 @@
                 </svg>
             </template>
         </button>
+
+        <script>
+            document.addEventListener("DOMContentLoaded", async () => {
+                const params = new URLSearchParams(window.location.search);
+                const logId = params.get("id");
+            
+                if (logId) {
+                    try {
+                        const res = await fetch(`/csv_logs/${logId}`);
+                        if (!res.ok) throw new Error("File not found");
+                        const text = await res.text();
+                        console.log("Log content:", text);
+            
+                        const container = document.createElement("pre");
+                        container.textContent = text;
+                        document.querySelector(".log-content").appendChild(container);
+                    } catch (err) {
+                        alert("Failed to load log file: " + err.message);
+                    }
+                } else {
+                    alert("No log ID provided");
+                }
+            });
+            </script>
+
+
     </body>
 </html>
+

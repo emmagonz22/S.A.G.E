@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
     <head>
+        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+        <meta http-equiv="Pragma" content="no-cache">
+        <meta http-equiv="Expires" content="0">
+
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>S.A.G.E Web Server</title>
@@ -21,10 +25,14 @@
         
         <div class="content">
             <!-- Start Routine -->
-            <button class="btn btn-home success"> Start Device </button>
+            <button class="btn btn-home success" onclick="fetch('/start_sensor')"> Start Sensors </button>
+            <!-- Pause Routine -->
+            <button class="btn btn-home warning" onclick="fetch('/toggle_sensor')"> Toggle Sensors </button>
             <!-- End Routine -->
-            <button class="btn btn-home danger"> End Device </button>
+            <button class="btn btn-home danger" onclick="fetch('/end_sensor')"> End Sensors </button>
 
+            <textarea id="DeviceName" rows="4" cols="30" placeholder="Enter device name..." class="textbox"></textarea>
+            <button class="btn btn-home setter" onclick="setDeviceName()"> Set Name </button>
             <!--
 
                 Add Graph of the current run? 

@@ -13,4 +13,4 @@ project(S.A.G.A)
 set(EXTRA_COMPONENT_DIRS components)
 
 # Create SPIFFS partition image for web content
-spiffs_create_partition_image(storage web FLASH_IN_PROJECT)
+spiffs_create_partition_image(csv_logs web FLASH_IN_PROJECT)
