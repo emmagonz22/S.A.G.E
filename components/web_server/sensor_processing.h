@@ -72,6 +72,8 @@ void save_csv_to_flash(char *name);
 void read_csv_from_flash(char *name);
 // static esp_err_t init_spiffs(void);
 void write_test_csv_to_flash(void);
+void write_test_csv_to_flash_1(void);
+void write_test_csv_to_flash_2(void);
 
 void sensor_task(void *pvParameters);
 void start_sensor();

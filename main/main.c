@@ -149,5 +149,7 @@ void app_main(void)
 
     // Later: pass to app interface
     write_test_csv_to_flash();
+    write_test_csv_to_flash_1();
+    write_test_csv_to_flash_2();
 }
 
